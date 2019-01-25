@@ -1,0 +1,33 @@
+["sea1", "sfo1", "lax1", "iah1", "atl1", "iad1", "ewr1"]
+["sea1", "slc1", "mci1", "ord1", "cle1", "ewr1"]
+
+["slc1", "mci1", "ord1", "cle1", "ewr1"]
+
+["mci1", "iah1", "atl1", "iad1", "ewr1"]
+["mci1", "ord1", "cle1", "ewr1"]
+
+["ord1", "cle1", "iad1", "ewr1"]
+["ord1", "atl1", "iad1", "ewr1"]
+["ord1", "cle1", "ewr1"]
+
+["cle1", "ewr1"]
+["cle1", "iad1", "ewr1"]
+
+["iad1", "ewr1"]
+["iad1", "cle1", "ewr1"]
+
+["atl1", "ord1", "cle1", "ewr1"]
+["atl1", "iad1", "cle1", "ewr1"]
+["atl1", "iad1", "ewr1"]
+
+["iah1", "atl1", "iad1", "ewr1"]
+["iah1", "atl1", "iad1", "cle1", "ewr1"]
+["iah1", "mci1", "ord1", "cle1", "ewr1"]
+
+["lax1", "iah1", "atl1", "iad1", "ewr1"]
+["lax1", "iah1", "atl1", "iad1", "cle1", "ewr1"]
+["lax1", "slc1", "mci1", "ord1", "cle1", "ewr1"]
+
+["sfo1", "sea1", "slc1", "mci1", "ord1", "cle1", "ewr1"]
+["sfo1", "lax1", "iah1", "atl1", "iad1", "cle1", "ewr1"]
+["sfo1", "lax1", "iah1", "atl1", "iad1", "ewr1"]
