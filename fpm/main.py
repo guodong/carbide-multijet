@@ -1,10 +1,8 @@
 #!/usr/bin/python
 import socket
-import array
 import struct
 import os
 import netifaces
-from python_arptable import ARPTABLE
 import fpm_pb2 as fpm
 import time
 import logging
@@ -18,11 +16,11 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 ifaces = netifaces.interfaces()
-ifaces.remove('eth0')  # eth0 must be last
+ifaces.remove('eth0')
 ifaces.remove('lo')
 
 
-# fpm nexthop interface id to ovs port id, eg: 9 -> 0 means #9 is i0, i0 -> eth0, eth0 -> of port 1
+# fpm nexthop interface id to ovs port id, eg: 9 -> 2 means #9 is i0, ofport is e0 id = 1
 def ifIdtoPortId(ifId):
     if ifId > 100:  # it's docker bridge
         return None

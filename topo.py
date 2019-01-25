@@ -68,7 +68,7 @@ def start():
                                           hostname=r.id,
                                           volumes={os.getcwd() + '/configs/' + r.id: {'bind': '/etc/quagga'},
                                                    os.getcwd() + '/bootstrap': {'bind': '/bootstrap'},
-                                                   os.getcwd() + '/fpmserver': {'bind': '/fpmserver'}},
+                                                   os.getcwd() + '/fpm': {'bind': '/fpm'}},
                                           command='/bootstrap/start.sh')
         containers[r.id] = container
 
@@ -77,7 +77,6 @@ def start():
     print 'setup links'
     i = 0
     j = 0
-    count = 0
     for l in links:
         srcPid = client.containers.get(l[0].id).attrs['State']['Pid']
         dstPid = client.containers.get(l[1].id).attrs['State']['Pid']
@@ -207,7 +206,7 @@ def start():
     for r in routers.values():
         print 'start ospf for ' + r.id
         c = containers[r.id]
-        c.exec_run('python /fpmserver/fpm/main.py &', detach=True)
+        c.exec_run('python /fpm/main.py &', detach=True)
 
     print 'finished'
 

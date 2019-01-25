@@ -7,7 +7,7 @@ import json
 
 from core.Space import Space
 
-MULTIJET_IP_PROTO = 33
+MULTIJET_IP_PROTO = 143
 
 
 class Datapath:
@@ -63,12 +63,13 @@ class Datapath:
         eth_header = ethernet.ethernet()
         p.add_protocol(eth_header)
         ip_header = ipv4.ipv4(proto=MULTIJET_IP_PROTO)
-        ip_header.serialize(msg, p)
+        ip_header.serialize(msg, eth_header)
         p.add_protocol(ip_header)
         p.add_protocol(msg)
 
         ofp = self.dp.ofproto
         parser = self.dp.ofproto_parser
+        print ip_header.dst
         p.serialize()
         data = p.data
         actions = [parser.OFPActionOutput(ofp.OFPP_FLOOD)]
@@ -139,6 +140,8 @@ class Multijet(app_manager.RyuApp):
         # print (ev.msg.to_jsondict())
         rules = []
         for stat in ev.msg.body:
+            if stat.table_id < 10:  # cp tables id larger than 10
+                continue
             match = {}
             action = {}
             for k, v in stat.match.items():
@@ -173,5 +176,3 @@ class Multijet(app_manager.RyuApp):
         if msg['route'][-1] == dp.dp.id:
             return
         dp.calc_ec(in_port, msg['route'], msg['space'])
-
-
