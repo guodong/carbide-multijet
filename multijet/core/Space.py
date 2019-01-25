@@ -143,7 +143,3 @@ class Space:
     def area_to_match(self, area):
         return
 
-    def dump(self):
-        for a in self.areas:
-            print a
-
