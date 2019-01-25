@@ -132,7 +132,8 @@ class RocketFuel:
         exit(0)
 
     def gen_config(self):
-        shutil.rmtree('configs')
+        if os.path.exists('configs'):
+            shutil.rmtree('configs')
         for r in self.routers.values():
             utils.mkdir_p('configs/' + r.id)
             with open('configs/' + r.id + '/zebra.conf', 'a') as f:
