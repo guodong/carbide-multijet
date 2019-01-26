@@ -186,7 +186,7 @@ class Verifier(Thread):
             out = parser.OFPPacketOut(datapath=self.dp, buffer_id=ofp.OFP_NO_BUFFER, in_port=ofp.OFPP_CONTROLLER,
                                       actions=actions, data=data)
             self.dp.send_msg(out)
-        log('unicast finished: ' + msg['data']['type'])
+        log('unicast finished')
 
     def flood(self, msg, except_port=None):
         size = len(msg)
