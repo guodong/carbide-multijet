@@ -29,6 +29,8 @@ class Verifier(Thread):
             if msg['cpid'] == self.cpid:
                 data = msg['data']
                 if data['type'] == 'add_rules':
+                    self.rules = []
+                    self.ecs = []
                     self.rules.extend(data['rules'])
                     self.build_space()
                 elif data['type'] == 'verify':
@@ -72,17 +74,21 @@ class Verifier(Thread):
                     self.do_update(data['from'], data['route'], data['space'])
 
     def build_space(self):
+        self.forward_rules = {}
         for rule in self.rules:
             if not self.forward_rules.has_key(rule['action']['output']):
                 self.forward_rules[rule['action']['output']] = Space()
             self.forward_rules[rule['action']['output']].plus(Space(match=rule['match']))
 
-        self.ecs = []
-        self.ecs.append({
-            'route': [platform.node()],
-            'space': self.get_init_ec_space()
-        })
+        self.add_ec([platform.node()], Space(areas=[''.ljust(336, '*')]))
         log('finish build ec')
+
+    def add_ec(self, route, space):
+        for ec in self.ecs:
+            if ec['route'] == route:
+                ec['space'].plus(space)
+                return
+        self.ecs.append({'route': route, 'space': space})
 
     def update_space(self, rule):
         self.rules.append(rule)
@@ -105,14 +111,20 @@ class Verifier(Thread):
             if ec['route'][-1] == from_:
                 ec['route'].extend(route)
                 ec['space'].plus(Space(areas=space))
-
+        log('updated')
         self.dump_ecs()
 
     def get_init_ec_space(self):
+
+        for ec in self.ecs:
+            print ec['route']
+            if ec['route'][0] == platform.node():
+                print 'return'
+                return ec['space']
+
         result = Space()
         for s in self.forward_rules.values():
             result.plus(s)
-
         return result.notme()
 
     def init_ec(self):
@@ -122,7 +134,7 @@ class Verifier(Thread):
             'data': {
                 'type': 'ec',
                 'route': [platform.node()],
-                'space': self.get_init_ec_space().areas
+                'space': [''.ljust(336, '*')]  # self.get_init_ec_space().areas
             }
         }
         self.flood(json.dumps(msg))
@@ -135,7 +147,7 @@ class Verifier(Thread):
         if len(space.areas) == 0:
             return
         route.insert(0, platform.node())
-        self.ecs.append({'route': route, 'space': space})
+        self.add_ec(route, space)
         msg = {
             'cpid': self.cpid,
             'src': platform.node(),
@@ -221,7 +233,7 @@ class Verifier(Thread):
             out = parser.OFPPacketOut(datapath=self.dp, buffer_id=ofp.OFP_NO_BUFFER, in_port=except_port,
                                       actions=actions, data=data)
             self.dp.send_msg(out)
-        log('flood finished: ' + msg['data']['type'])
+        log('flood finished')
 
     def dump_ecs(self):
         log('ecs of: ' + str(platform.node()))

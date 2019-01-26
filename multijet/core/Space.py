@@ -36,7 +36,7 @@ def intersect(space1, space2):
             result_space += space2[i]
         else:
             result_space += space1[i]
-
+    print result_space
     return result_space
 
 
@@ -131,7 +131,7 @@ class Space:
                 self.areas.append(sa)
                 changed = True
 
-        self.areas.sort()
+        # self.areas.sort()
 
         return changed
 
@@ -142,8 +142,8 @@ class Space:
                 result.append(intersect(sa, a))
 
         self.areas = [x for x in result if x is not None]
-        self.areas = list(set(self.areas))
-        self.areas.sort()
+        # self.areas = list(set(self.areas))
+        # self.areas.sort()
 
     def notme(self):
         spaces = []
@@ -154,7 +154,7 @@ class Space:
                     item = list(''.ljust(len(a), '*'))
                     item[i] = a[i]
                     s.areas.append(''.join(item))
-        spaces.append(s)
+            spaces.append(s)
 
         result = Space(areas=[''.ljust(336, '*')])
         for s in spaces:

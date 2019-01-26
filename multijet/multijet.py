@@ -72,6 +72,7 @@ class Multijet(app_manager.RyuApp):
 
     @set_ev_cls(ofp_event.EventOFPStateChange, MAIN_DISPATCHER)
     def switch_in_handler(self, ev):
+        print 'comming switch'
         dp = ev.datapath
         ofp = dp.ofproto
         parser = dp.ofproto_parser
@@ -147,7 +148,7 @@ class Multijet(app_manager.RyuApp):
 
         if len(self.msg_buf[msg['seq']]) == msg['count']:
             payload = ''.join(self.msg_buf[msg['seq']])
-            log('received from ' + str(in_port) + ': ' + payload[:60])
+            log('received from ' + str(in_port) + ': ' + payload[:100])
 
             parsed = json.loads(payload)
             parsed['in_port'] = in_port

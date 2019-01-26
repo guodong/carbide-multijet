@@ -1,6 +1,7 @@
 import docker
 import os, shutil, signal, time, sys, urllib2, shutil, urllib
 import utils
+import grequests
 
 client = docker.from_env()
 
@@ -59,6 +60,8 @@ class RocketFuel:
                                                        os.getcwd() + '/multijet': {'bind': '/multijet'}},
                                               command='/bootstrap/start.sh')
             self.containers[r.id] = container
+
+        time.sleep(3)
 
         print 'setup links'
         i = 0
@@ -161,18 +164,30 @@ class RocketFuel:
         while True:
             cmd = raw_input('multijet> ')
             if cmd == 'fetch rules':
+                urls = []
                 for c in self.containers:
                     ip = str(client.containers.get(c).attrs['NetworkSettings']['Networks']['bridge']['IPAddress'])
-                    urllib2.urlopen('http://' + ip + ':6666/?type=get_rules')
+                    urls.append('http://' + ip + ':6666/?type=get_rules')
+                    # urllib2.urlopen('http://' + ip + ':6666/?type=get_rules')
+                rs = (grequests.get(u) for u in urls)
+                grequests.map(rs)
             elif cmd == 'verify':
-                for c in self.containers:
-                    ip = str(client.containers.get(c).attrs['NetworkSettings']['Networks']['bridge']['IPAddress'])
-                    urllib2.urlopen('http://' + ip + ':6666/?type=verify')
+                urls = []
+                try:
+                    for c in self.containers:
+                        ip = str(client.containers.get(c).attrs['NetworkSettings']['Networks']['bridge']['IPAddress'])
+                        urls.append('http://' + ip + ':6666/?type=verify')
+                        # urllib2.urlopen('http://' + ip + ':6666/?type=verify')
+                    rs = (grequests.get(u) for u in urls)
+                    grequests.map(rs)
+                except Exception, e:
+                    print e.message
 
             elif cmd == 'add rule':
                 node = raw_input('which node: ')
                 cp = raw_input('which control plane: ')
-                rule = raw_input('rule: ')  # eg: {"match": {"ipv4_dst": ["1.1.1.1", "255.255.255.0"]}, "action": {"output": 1}}
+                rule = raw_input(
+                    'rule: ')  # eg: {"match": {"ipv4_dst": ["1.1.1.1", "255.255.255.0"]}, "action": {"output": 1}}
                 c = client.containers.get(node)
                 d = {
                     'type': 'add_rule',
