@@ -162,3 +162,5 @@ configs/*
 
 !.gitkeep
 .idea/inspectionProfiles/
+
+/results

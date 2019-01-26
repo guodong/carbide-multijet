@@ -29,17 +29,22 @@ class Verifier(Thread):
             if msg['cpid'] == self.cpid:
                 data = msg['data']
                 if data['type'] == 'add_rules':
+                    log('add_rules')
                     self.rules = []
                     self.ecs = []
                     self.rules.extend(data['rules'])
                     self.build_space()
                 elif data['type'] == 'verify':
+                    log('verify')
                     self.init_ec()
                 elif data['type'] == 'ec':
+                    log('ec')
                     self.calc_ec(msg['in_port'], data['route'], data['space'])
                 elif data['type'] == 'update_add_rule':
+                    log('update_add_rule')
                     self.update_space(data['rule'])
                 elif data['type'] == 'update_request':
+                    log('update_request')
                     for ec in self.ecs:
                         s = Space(areas=data['space'])
                         s.multiply(ec['space'])
@@ -59,6 +64,7 @@ class Verifier(Thread):
                             }
                             self.flood(json.dumps(m))
                 elif data['type'] == 'update':
+                    log('update')
                     if data['seq'] in self.received_seqs:
                         continue
                     # 1. flood out
@@ -236,9 +242,9 @@ class Verifier(Thread):
         log('flood finished')
 
     def dump_ecs(self):
-        log('ecs of: ' + str(platform.node()))
-        for ec in self.ecs:
-            log(ec['route'])
+        log('ecs count: ' + str(len(self.ecs)))
+        # for ec in self.ecs:
+        #     log(ec['route'])
             # for a in ec['space'].areas:
             #     log(a)
-        log('count: ' + str(len(self.ecs)))
+        # log('count: ' + str(len(self.ecs)))
