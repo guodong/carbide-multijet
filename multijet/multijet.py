@@ -94,6 +94,7 @@ class Multijet(app_manager.RyuApp):
     @set_ev_cls(ofp_event.EventOFPFlowStatsReply, MAIN_DISPATCHER)
     def flow_stats_reply_handler(self, ev):
         # print (ev.msg.to_jsondict())
+        rules = {}  # cpid => rules
         for stat in ev.msg.body:
             if stat.table_id < 10:  # cp tables id larger than 10
                 continue
@@ -112,14 +113,17 @@ class Multijet(app_manager.RyuApp):
             if action['output'] > 999:  # to controller rule
                 continue
 
+            if not rules.has_key(stat.table_id):
+                rules[stat.table_id] = []
+
+            rules[stat.table_id].append({'match': match, 'action': action})
+
+        for cpid, rlist in rules.items():
             msg = {
-                'cpid': stat.table_id,
+                'cpid': cpid,
                 'data': {
-                    'type': 'add_rule',
-                    'rule': {
-                        'match': match,
-                        'action': action
-                    }
+                    'type': 'add_rules',
+                    'rules': rlist
                 }
             }
             self.queue.put(msg)
@@ -143,11 +147,9 @@ class Multijet(app_manager.RyuApp):
 
         if len(self.msg_buf[msg['seq']]) == msg['count']:
             payload = ''.join(self.msg_buf[msg['seq']])
-            log('received from ' + str(in_port) + ': ' + payload)
+            log('received from ' + str(in_port) + ': ' + payload[:50])
 
             parsed = json.loads(payload)
             parsed['in_port'] = in_port
 
             self.queue.put(parsed)
-
-

@@ -28,8 +28,8 @@ class Verifier(Thread):
             msg = self.queue.get()
             if msg['cpid'] == self.cpid:
                 data = msg['data']
-                if data['type'] == 'add_rule':
-                    self.rules.append(data['rule'])
+                if data['type'] == 'add_rules':
+                    self.rules.extend(data['rules'])
                     self.build_space()
                 elif data['type'] == 'verify':
                     self.init_ec()
@@ -105,6 +105,8 @@ class Verifier(Thread):
             if ec['route'][-1] == from_:
                 ec['route'].extend(route)
                 ec['space'].plus(Space(areas=space))
+
+        self.dump_ecs()
 
     def get_init_ec_space(self):
         result = Space()
@@ -184,7 +186,7 @@ class Verifier(Thread):
             out = parser.OFPPacketOut(datapath=self.dp, buffer_id=ofp.OFP_NO_BUFFER, in_port=ofp.OFPP_CONTROLLER,
                                       actions=actions, data=data)
             self.dp.send_msg(out)
-        log('unicast finished: ' + msg)
+        log('unicast finished: ' + msg['data']['type'])
 
     def flood(self, msg, except_port=None):
         size = len(msg)
@@ -219,12 +221,12 @@ class Verifier(Thread):
             out = parser.OFPPacketOut(datapath=self.dp, buffer_id=ofp.OFP_NO_BUFFER, in_port=except_port,
                                       actions=actions, data=data)
             self.dp.send_msg(out)
-        log('flood finished: ' + msg)
+        log('flood finished: ' + msg['data']['type'])
 
     def dump_ecs(self):
         log('ecs of: ' + str(platform.node()))
         for ec in self.ecs:
             log(ec['route'])
-            for a in ec['space'].areas:
-                log(a)
+            # for a in ec['space'].areas:
+            #     log(a)
         log('count: ' + str(len(self.ecs)))
