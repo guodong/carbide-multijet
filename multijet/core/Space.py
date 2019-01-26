@@ -44,7 +44,12 @@ class Space:
     def __init__(self, areas=None, match=None):
         if areas is None:
             areas = []
-        self.areas = areas
+
+        self.areas = []
+
+        # must copy areas, in case area change outside makes this space change
+        for a in areas:
+            self.areas.append(a)
 
         if match is None:
             match = {}
@@ -140,6 +145,30 @@ class Space:
         self.areas = list(set(self.areas))
         self.areas.sort()
 
-    def area_to_match(self, area):
-        return
+    def notme(self):
+        spaces = []
+        for a in self.areas:
+            s = Space()
+            for i in range(len(a)):
+                if a[i] is not '*':
+                    item = list(''.ljust(len(a), '*'))
+                    item[i] = a[i]
+                    s.areas.append(''.join(item))
+        spaces.append(s)
+
+        result = Space(areas=[''.ljust(336, '*')])
+        for s in spaces:
+            result.multiply(s)
+
+        return result
+
+    def clone(self):
+        space = Space()
+        for a in self.areas:
+            space.areas.append(a)
+
+        return space
+
+
+
 

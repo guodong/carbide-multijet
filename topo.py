@@ -1,5 +1,5 @@
 import docker
-import os, shutil, signal, time, sys, urllib2, shutil
+import os, shutil, signal, time, sys, urllib2, shutil, urllib
 import utils
 
 client = docker.from_env()
@@ -168,6 +168,19 @@ class RocketFuel:
                 for c in self.containers:
                     ip = str(client.containers.get(c).attrs['NetworkSettings']['Networks']['bridge']['IPAddress'])
                     urllib2.urlopen('http://' + ip + ':6666/?type=verify')
+
+            elif cmd == 'add rule':
+                node = raw_input('which node: ')
+                cp = raw_input('which control plane: ')
+                rule = raw_input('rule: ')  # eg: {"match": {"ipv4_dst": ["1.1.1.1", "255.255.255.0"]}, "action": {"output": 1}}
+                c = client.containers.get(node)
+                d = {
+                    'type': 'add_rule',
+                    'cp': cp,
+                    'rule': rule
+                }
+                ip = str(c.attrs['NetworkSettings']['Networks']['bridge']['IPAddress'])
+                urllib2.urlopen('http://' + ip + ':6666/?' + urllib.urlencode(d))
 
 
 if __name__ == '__main__':

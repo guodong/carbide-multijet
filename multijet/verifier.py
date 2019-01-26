@@ -1,4 +1,4 @@
-import json
+import json, platform
 from threading import Thread
 from core.Space import Space
 from ryu.lib.packet import packet, ethernet, ipv4
@@ -20,18 +20,56 @@ class Verifier(Thread):
         self.rules = []
         self.forward_rules = {}
         self.ecs = []
+        self.seq = 0
+        self.received_seqs = []  # forbid update msg loop
 
     def run(self):
         while True:
             msg = self.queue.get()
-            if msg['type'] == 'verify':
-                print 'verify'
-                self.init_ec()
-            elif msg['type'] == 'add_rule' and msg['cpid'] == self.cpid:
-                self.rules.append(msg['rule'])
-                self.build_space()
-            elif msg['type'] == 'ec':
-                self.calc_ec(msg['in_port'], msg['route'], msg['space'])
+            if msg['cpid'] == self.cpid:
+                data = msg['data']
+                if data['type'] == 'add_rule':
+                    self.rules.append(data['rule'])
+                    self.build_space()
+                elif data['type'] == 'verify':
+                    self.init_ec()
+                elif data['type'] == 'ec':
+                    self.calc_ec(msg['in_port'], data['route'], data['space'])
+                elif data['type'] == 'update_add_rule':
+                    self.update_space(data['rule'])
+                elif data['type'] == 'update_request':
+                    for ec in self.ecs:
+                        s = Space(areas=data['space'])
+                        s.multiply(ec['space'])
+                        if len(s.areas) > 0:
+                            seq = self.gen_seq()
+                            self.received_seqs.append(seq)
+                            m = {
+                                'cpid': self.cpid,
+                                'src': platform.node(),
+                                'data': {
+                                    'seq': seq,
+                                    'type': 'update',
+                                    'from': data['from'],
+                                    'route': ec['route'],
+                                    'space': s.areas
+                                }
+                            }
+                            self.flood(json.dumps(m))
+                elif data['type'] == 'update':
+                    if data['seq'] in self.received_seqs:
+                        continue
+                    # 1. flood out
+                    self.received_seqs.append(data['seq'])
+                    m = {
+                        'cpid': self.cpid,
+                        'src': platform.node(),
+                        'data': data
+                    }
+                    self.flood(json.dumps(m), msg['in_port'])
+
+                    # 2. do local update
+                    self.do_update(data['from'], data['route'], data['space'])
 
     def build_space(self):
         for rule in self.rules:
@@ -39,11 +77,51 @@ class Verifier(Thread):
                 self.forward_rules[rule['action']['output']] = Space()
             self.forward_rules[rule['action']['output']].plus(Space(match=rule['match']))
 
+        self.ecs = []
+        self.ecs.append({
+            'route': [platform.node()],
+            'space': self.get_init_ec_space()
+        })
+        log('finish build ec')
+
+    def update_space(self, rule):
+        self.rules.append(rule)
+        self.build_space()
+        space = Space(match=rule['match'])
+        msg = {
+            'cpid': self.cpid,
+            'src': platform.node(),
+            'data': {
+                'type': 'update_request',
+                'from': platform.node(),
+                'space': space.areas
+            }
+        }
+
+        self.unicast(json.dumps(msg), rule['action']['output'])
+
+    def do_update(self, from_, route, space):
+        for ec in self.ecs:
+            if ec['route'][-1] == from_:
+                ec['route'].extend(route)
+                ec['space'].plus(Space(areas=space))
+
+    def get_init_ec_space(self):
+        result = Space()
+        for s in self.forward_rules.values():
+            result.plus(s)
+
+        return result.notme()
+
     def init_ec(self):
         msg = {
-            'type': 'init',
-            'route': [self.dp.id],
-            'space': [''.ljust(336, '*')]
+            'cpid': self.cpid,
+            'src': platform.node(),
+            'data': {
+                'type': 'ec',
+                'route': [platform.node()],
+                'space': self.get_init_ec_space().areas
+            }
         }
         self.flood(json.dumps(msg))
 
@@ -54,41 +132,97 @@ class Verifier(Thread):
         space.multiply(self.forward_rules[in_port])
         if len(space.areas) == 0:
             return
-        route.insert(0, self.dp.id)
+        route.insert(0, platform.node())
         self.ecs.append({'route': route, 'space': space})
         msg = {
-            'type': 'flood',
-            'route': route,
-            'space': space.areas
+            'cpid': self.cpid,
+            'src': platform.node(),
+            'data': {
+                'type': 'ec',
+                'route': route,
+                'space': space.areas
+            }
         }
         if len(space.areas) > 0:
             self.flood(json.dumps(msg), in_port)
 
         self.dump_ecs()
 
-    def flood(self, msg, except_port=None):
-        p = packet.Packet()
-        eth_header = ethernet.ethernet()
-        p.add_protocol(eth_header)
-        ip_header = ipv4.ipv4(proto=self.MULTIJET_IP_PROTO)
-        ip_header.serialize(msg, eth_header)
-        p.add_protocol(ip_header)
-        p.add_protocol(msg)
+    def gen_seq(self):
+        seq = str(self.dp.id) + str(self.cpid) + str(self.seq)
+        self.seq = self.seq + 1
+        return seq
 
-        ofp = self.dp.ofproto
-        parser = self.dp.ofproto_parser
-        print ip_header.dst
-        p.serialize()
-        data = p.data
-        actions = [parser.OFPActionOutput(ofp.OFPP_FLOOD)]
-        if except_port is None:
-            except_port = ofp.OFPP_CONTROLLER
-        out = parser.OFPPacketOut(datapath=self.dp, buffer_id=ofp.OFP_NO_BUFFER, in_port=except_port,
-                                  actions=actions, data=data)
-        self.dp.send_msg(out)
+    def unicast(self, msg, port):
+        size = len(msg)
+        buf_size = 1200
+        offset = 0
+        count = size / buf_size + 1
+        seq = self.gen_seq()
+        while size > 0:
+            frag = msg[offset:offset + buf_size]
+            offset = offset + buf_size
+            size = size - buf_size
+            pkt_data = json.dumps({
+                'seq': seq,
+                'count': count,
+                'data': frag
+            })
+            p = packet.Packet()
+            eth_header = ethernet.ethernet()
+            ip_header = ipv4.ipv4(proto=self.MULTIJET_IP_PROTO)
+            ip_header.serialize(pkt_data, eth_header)
+            p.add_protocol(eth_header)
+            p.add_protocol(ip_header)
+            p.add_protocol(pkt_data)
+
+            ofp = self.dp.ofproto
+            parser = self.dp.ofproto_parser
+            p.serialize()
+            data = p.data
+            actions = [parser.OFPActionOutput(port)]
+            out = parser.OFPPacketOut(datapath=self.dp, buffer_id=ofp.OFP_NO_BUFFER, in_port=ofp.OFPP_CONTROLLER,
+                                      actions=actions, data=data)
+            self.dp.send_msg(out)
+        log('unicast finished: ' + msg)
+
+    def flood(self, msg, except_port=None):
+        size = len(msg)
+        buf_size = 1200
+        offset = 0
+        count = size / buf_size + 1
+        seq = self.gen_seq()
+        while size > 0:
+            frag = msg[offset:offset + buf_size]
+            offset = offset + buf_size
+            size = size - buf_size
+            pkt_data = json.dumps({
+                'seq': seq,
+                'count': count,
+                'data': frag
+            })
+            p = packet.Packet()
+            eth_header = ethernet.ethernet()
+            ip_header = ipv4.ipv4(proto=self.MULTIJET_IP_PROTO)
+            ip_header.serialize(pkt_data, eth_header)
+            p.add_protocol(eth_header)
+            p.add_protocol(ip_header)
+            p.add_protocol(pkt_data)
+
+            ofp = self.dp.ofproto
+            parser = self.dp.ofproto_parser
+            p.serialize()
+            data = p.data
+            actions = [parser.OFPActionOutput(ofp.OFPP_FLOOD)]
+            if except_port is None:
+                except_port = ofp.OFPP_CONTROLLER
+            out = parser.OFPPacketOut(datapath=self.dp, buffer_id=ofp.OFP_NO_BUFFER, in_port=except_port,
+                                      actions=actions, data=data)
+            self.dp.send_msg(out)
+        log('flood finished: ' + msg)
 
     def dump_ecs(self):
-        log('ecs of: ' + str(self.dp.id))
+        log('ecs of: ' + str(platform.node()))
         for ec in self.ecs:
             log(ec['route'])
             for a in ec['space'].areas:

@@ -19,7 +19,7 @@ class S(BaseHTTPRequestHandler):
 
         self._set_headers()
         self.wfile.write("triggered")
-        on_trigger_handler(type)
+        on_trigger_handler(type, query_components)
 
 
 class TriggerServer(Thread):

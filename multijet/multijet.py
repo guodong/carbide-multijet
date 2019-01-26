@@ -1,5 +1,5 @@
 import json
-import os
+import os, platform
 from Queue import Queue
 
 from ryu.base import app_manager
@@ -30,30 +30,45 @@ class Multijet(app_manager.RyuApp):
         t = TriggerServer(self.on_trigger)
         t.start()
 
+        self.msg_buf = {}
+
         '''
         add more cps here to start multi verify threads
         '''
-        cps = [100]
+        self.cps = [100]
 
         self.queue = Queue()
-        for cp in cps:
+        for cp in self.cps:
             verifier = Verifier(int(cp), queue=self.queue)
             self.verifiers[int(cp)] = verifier
             verifier.start()
 
-    def on_trigger(self, type='get_rules'):
+    def on_trigger(self, type='get_rules', comps=None):
         if type == 'get_rules':
             parser = self.dp.ofproto_parser
+            log('start fetch rules')
             self.dp.send_msg(parser.OFPFlowStatsRequest(datapath=self.dp))
         elif type == 'verify':
-            msg = {'type': 'verify'}
+            for cp in self.cps:
+                msg = {
+                    'cpid': cp,
+                    'data': {
+                        'type': 'verify'
+                    }
+                }
             self.queue.put(msg)
-
-    def get_dp(self, dp):
-        for d in self.dps:
-            if dp == d.dp:
-                return d
-        return None
+        elif type == 'add_rule':
+            cp = int(comps['cp'][0])
+            rule = json.loads(comps['rule'][0])
+            msg = {
+                'cpid': cp,
+                'data': {
+                    'type': 'update_add_rule',
+                    'rule': rule
+                }
+            }
+            print msg
+            self.queue.put(msg)
 
     @set_ev_cls(ofp_event.EventOFPStateChange, MAIN_DISPATCHER)
     def switch_in_handler(self, ev):
@@ -98,14 +113,18 @@ class Multijet(app_manager.RyuApp):
                 continue
 
             msg = {
-                'type': 'add_rule',
                 'cpid': stat.table_id,
-                'rule': {
-                    'match': match,
-                    'action': action
+                'data': {
+                    'type': 'add_rule',
+                    'rule': {
+                        'match': match,
+                        'action': action
+                    }
                 }
             }
             self.queue.put(msg)
+
+        log('finish fetch rules')
 
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
     def packet_in_handler(self, ev):
@@ -116,14 +135,19 @@ class Multijet(app_manager.RyuApp):
         if not pkt_ip.proto == MULTIJET_IP_PROTO:
             return
         payload = pkt.protocols[-1]
-        log('received from ' + str(in_port) + ': ' + payload)
         msg = json.loads(payload)
-        if msg['route'][-1] == self.dp.id:
-            return
-        m = {
-            'type': 'ec',
-            'in_port': in_port,
-            'route': msg['route'],
-            'space': msg['space']
-        }
-        self.queue.put(m)
+        if not self.msg_buf.has_key(msg['seq']):
+            self.msg_buf[msg['seq']] = []
+
+        self.msg_buf[msg['seq']].append(msg['data'])
+
+        if len(self.msg_buf[msg['seq']]) == msg['count']:
+            payload = ''.join(self.msg_buf[msg['seq']])
+            log('received from ' + str(in_port) + ': ' + payload)
+
+            parsed = json.loads(payload)
+            parsed['in_port'] = in_port
+
+            self.queue.put(parsed)
+
+
