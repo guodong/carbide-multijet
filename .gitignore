@@ -163,4 +163,4 @@ configs/*
 !.gitkeep
 .idea/inspectionProfiles/
 
-/results
+.DS_Store
