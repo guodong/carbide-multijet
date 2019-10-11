@@ -10,9 +10,8 @@ from ryu.ofproto import ofproto_v1_3
 
 from trigger_server import TriggerServer
 from verifier import Verifier
+# from verifier_thread import VerifierThread as Verifier
 from utils import log
-
-MULTIJET_IP_PROTO = 143
 
 
 class Multijet(app_manager.RyuApp):
@@ -127,6 +126,9 @@ class Multijet(app_manager.RyuApp):
                     'rules': rlist
                 }
             }
+            if cpid == 100:
+                with open('/common/ospf'+str(platform.node())+'.json', 'w') as f:
+                    json.dump(rlist, f, indent=2)
             self.queue.put(msg)
 
         log('finish fetch rules')

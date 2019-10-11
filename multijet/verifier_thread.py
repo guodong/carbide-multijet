@@ -1,27 +1,33 @@
-import json, platform
+import json
+import pickle
+import zlib
+import platform
 from threading import Thread
-from core.Space import Space
+
 from ryu.lib.packet import packet, ethernet, ipv4
+
 from utils import log
+from .ecs_mgr import ECSMgrPickle
+from .topo import Topology
 
 
-class Verifier(Thread):
-    MULTIJET_IP_PROTO = 143
+class VerifierThread(Thread, ECSMgrPickle):
+    MULTIJET_IP_UNICAST_PROTO = 143
+    MULTIJET_IP_FLOOD_PROTO = 144
 
     def __init__(self, cpid, queue):
-        """
+        '''
         One cp one verifier thread
         :param cpid: control plane id, we use it as table offset currently, cpid=100 meas flows should be installed to table 100
-        """
-        super(Verifier, self).__init__()
+        '''
+        # super(VerifierThread, self).__init__()
+        topo = Topology()
+        topo.load("/common/topology.json")
+        ECSMgrPickle.__init__(self, str(platform.node()), topo)
+        Thread.__init__(self)
         self.dp = None
         self.cpid = cpid
         self.queue = queue
-        self.rules = []
-        self.forward_rules = {}
-        self.ecs = []
-        self.seq = 0
-        self.received_seqs = []  # forbid update msg loop
 
     def run(self):
         while True:
@@ -79,99 +85,7 @@ class Verifier(Thread):
                     # 2. do local update
                     self.do_update(data['from'], data['route'], data['space'])
 
-    def build_space(self):
-        self.forward_rules = {}
-        for rule in self.rules:
-            if not self.forward_rules.has_key(rule['action']['output']):
-                self.forward_rules[rule['action']['output']] = Space()
-            self.forward_rules[rule['action']['output']].plus(Space(match=rule['match']))
 
-        self.add_ec([platform.node()], Space(areas=[''.ljust(336, '*')]))
-        log('finish build ec')
-
-    def add_ec(self, route, space):
-        for ec in self.ecs:
-            if ec['route'] == route:
-                ec['space'].plus(space)
-                return
-        self.ecs.append({'route': route, 'space': space})
-
-    def update_space(self, rule):
-        self.rules.append(rule)
-        self.build_space()
-        space = Space(match=rule['match'])
-        msg = {
-            'cpid': self.cpid,
-            'src': platform.node(),
-            'data': {
-                'type': 'update_request',
-                'from': platform.node(),
-                'space': space.areas
-            }
-        }
-
-        self.unicast(json.dumps(msg), rule['action']['output'])
-
-    def do_update(self, from_, route, space):
-        for ec in self.ecs:
-            if ec['route'][-1] == from_:
-                ec['route'].extend(route)
-                ec['space'].plus(Space(areas=space))
-        log('updated')
-        self.dump_ecs()
-
-    def get_init_ec_space(self):
-
-        for ec in self.ecs:
-            print ec['route']
-            if ec['route'][0] == platform.node():
-                print 'return'
-                return ec['space']
-
-        result = Space()
-        for s in self.forward_rules.values():
-            result.plus(s)
-        return result.notme()
-
-    def init_ec(self):
-        msg = {
-            'cpid': self.cpid,
-            'src': platform.node(),
-            'data': {
-                'type': 'ec',
-                'route': [platform.node()],
-                'space': [''.ljust(336, '*')]  # self.get_init_ec_space().areas
-            }
-        }
-        self.flood(json.dumps(msg))
-
-    def calc_ec(self, in_port, route, areas):
-        if not self.forward_rules.has_key(in_port):
-            return
-        space = Space(areas=areas)
-        space.multiply(self.forward_rules[in_port])
-        if len(space.areas) == 0:
-            return
-        route.insert(0, platform.node())
-        self.add_ec(route, space)
-        msg = {
-            'cpid': self.cpid,
-            'src': platform.node(),
-            'data': {
-                'type': 'ec',
-                'route': route,
-                'space': space.areas
-            }
-        }
-        if len(space.areas) > 0:
-            self.flood(json.dumps(msg), in_port)
-
-        self.dump_ecs()
-
-    def gen_seq(self):
-        seq = str(self.dp.id) + str(self.cpid) + str(self.seq)
-        self.seq = self.seq + 1
-        return seq
 
     def unicast(self, msg, port):
         size = len(msg)
@@ -240,13 +154,3 @@ class Verifier(Thread):
                                       actions=actions, data=data)
             self.dp.send_msg(out)
         log('flood finished')
-
-    def dump_ecs(self):
-        log('ecs count: ' + str(len(self.ecs)))
-        ecs_str = ""
-        for ec in self.ecs:
-            ecs_str += str(ec['route']) + ' -> '
-            for a in ec['space'].areas:
-                ecs_str += str(a) + ','
-        log(ecs_str)
-        # log('count: ' + str(len(self.ecs)))

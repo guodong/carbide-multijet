@@ -17,7 +17,8 @@ class MyFormatter(logging.Formatter):
 
 logger = logging.getLogger(__name__)
 logger.setLevel(level=logging.INFO)
-handler = logging.FileHandler("/etc/quagga/multijetlog")
+# handler = logging.FileHandler("/etc/quagga/multijetlog")
+handler = logging.StreamHandler()
 handler.setLevel(logging.INFO)
 formatter = MyFormatter(fmt='%(asctime)s %(created).6f %(message)s', datefmt='%Y-%m-%d,%H:%M:%S.%f')
 handler.setFormatter(formatter)

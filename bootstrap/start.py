@@ -26,3 +26,6 @@ for i in my_ifaces:
     os.system(cmd)
     cmd = 'ovs-ofctl add-flow s ip,nw_dst=' + ip + ',actions=output:' + str(idx * 2 + 2)
     os.system(cmd)
+
+cmd = 'ovs-ofctl add-flow s -OOpenFlow13 priority=0,action=goto_table:100'
+os.system(cmd)
