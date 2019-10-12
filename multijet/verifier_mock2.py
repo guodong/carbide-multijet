@@ -1,24 +1,22 @@
 import json
-from Queue import Queue
-from threading import Thread
+from multiprocessing import Process, Queue
 
 from netaddr import IPSet
 from utils import log
 from .ecs_mgr import ECSMgrPickle
 from .topo import Topology
 
-# DATADIR = 'configs/common'
-DATADIR = 'results/common'
+DATADIR = 'configs/common'
+# DATADIR = 'results/common'
 
-class MockVerifierThread(Thread, ECSMgrPickle):
+class MockVerifierThread(ECSMgrPickle):
 
-    def __init__(self, node_id, queue):
+    def __init__(self, node_id, qs):
         topo = Topology()
         topo.load(DATADIR+'/topo.json')
         ECSMgrPickle.__init__(self, node_id, topo)
-        Thread.__init__(self)
-        self.all_queue = None
-        self.queue = queue
+        self.all_queue = qs
+        self.queue = qs[node_id]
 
     def run(self):
         while True:
@@ -67,10 +65,12 @@ def main():
     topo = Topology()
     topo.load(DATADIR+'/topo.json')
     qs = {n : Queue() for n in topo.nodes.keys()}
-    ts = {n : MockVerifierThread(n, qs[n]) for n in topo.nodes.keys()}
+    ts = {n : MockVerifierThread(n, qs) for n in topo.nodes.keys()}
+    processes = []
     for t in ts.values():
-        t.all_queue = qs
-        t.start()
+        proc = Process(target=t.run)
+        proc.start()
+        processes.append(proc)
     for n in topo.nodes.keys():
         rules = load_rules(n)
         log(rules)
@@ -79,7 +79,7 @@ def main():
             'rules': rules
         })
     
-    for t in ts.values():
+    for t in processes:
         t.join()
 
 
