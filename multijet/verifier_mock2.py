@@ -20,15 +20,18 @@ class MockVerifierThread(ECSMgrPickle):
 
     def run(self):
         while True:
-            msg = self.queue.get()
-            # log(msg)
+            try:
+                msg = self.queue.get(timeout=10)
+            except Exception:
+                log(self.dump_ecs())
+                return
             if msg['type']=='local_update':
                 self.update_local_rules(msg['rules'])
             elif msg['type']=='unicast':
                 self._on_recv_unicast(msg['data'], msg['recv_port'])
             elif msg['type']=='flood':
                 self._on_recv_flood(msg['data'])
-            self.dump_ecs()
+            # self.dump_ecs()
 
     def unicast(self, msg, port):
         n, p = self._topo.get_nextport(self.node_id, port)
@@ -37,7 +40,7 @@ class MockVerifierThread(ECSMgrPickle):
             'data': msg,
             'recv_port': p
         })
-        log('unicast finished')
+        # log('unicast finished')
 
     def flood(self, msg):
         for n,q in self.all_queue.items():
@@ -46,7 +49,7 @@ class MockVerifierThread(ECSMgrPickle):
                     'type': 'flood',
                     'data': msg
                 })
-        log('flood finished')
+        # log('flood finished')
 
 
 def load_rules(n):

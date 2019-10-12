@@ -3,7 +3,6 @@ import zlib
 
 from netaddr import IPSet, IPNetwork
 from .topo import Topology
-from .utils import log
 
 class EC:
     def __init__(self, route, space):  # type: (tuple, IPSet) -> None
@@ -163,7 +162,7 @@ class ECSMgr:
         for ec in self._ecs.values():
             s += "%s <----> %s\n"%(str(ec.space), str(ec.route))
         s += "============%s==============\n" % self.node_id
-        log(s)
+        return s
 
 
 class ECSMgrPickle(ECSMgr):
