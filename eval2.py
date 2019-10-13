@@ -27,6 +27,7 @@ class RocketFuel:
         self.routers = {}
         self.links = []
         self.containers = {}
+        self.filename = filename
         with open(filename, 'r') as f:
             for line in f:
                 arr = line.split()
@@ -188,6 +189,13 @@ class RocketFuel:
             code, output = c.exec_run('ps')
             print(output)
 
+    def router_exec(self, line):
+        for r in self.routers.values():
+            print('exec cmd %s for %s'%(line, str(r.id)))
+            c = self.containers[r.id]
+            code, output = c.exec_run(line)
+            print(output)
+
     def stop(self, sig=None, frame=None):
         print 'cleaning containers...'
 
@@ -201,7 +209,7 @@ class RocketFuel:
         if os.path.exists('configs'):
             shutil.rmtree('configs')
         utils.mkdir_p('configs/common')
-        os.system('cp ignored/preset/* configs/common/')
+        os.system('cp ignored/preset/%s/* configs/common/'%(self.filename))
         for r in self.routers.values():
             utils.mkdir_p('configs/' + r.id)
             with open('configs/' + r.id + '/zebra.conf', 'a') as f:
@@ -242,6 +250,9 @@ class RocketFuel:
                 self.kill_ryu2()
             elif cmd == 'ps':
                 self.ps()
+            elif cmd == "exec":
+                line = raw_input('exec> ')
+                self.router_exec(line)
             elif cmd == "":
                 pass
             else:
