@@ -54,7 +54,7 @@ class Multijet(app_manager.RyuApp):
                         'type': 'verify'
                     }
                 }
-            self.queue.put(msg)
+                self.queue.put(msg)
         elif type == 'add_rule':
             cp = int(comps['cp'][0])
             rule = json.loads(comps['rule'][0])

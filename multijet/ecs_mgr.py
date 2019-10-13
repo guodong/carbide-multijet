@@ -4,6 +4,7 @@ import zlib
 from netaddr import IPSet, IPNetwork
 from .topo import Topology
 
+
 class EC:
     def __init__(self, route, space):  # type: (tuple, IPSet) -> None
         self.route = route  # (("sw1",2), ("sw1", 3))
@@ -191,7 +192,7 @@ class ECSMgrPickle(ECSMgr):
         data = zlib.compress(pickled)
         self.unicast(data, fwd_port)
 
-    def _on_recv_unicast(self, data, recv_port):
+    def on_recv_unicast(self, data, recv_port):
         pickled = zlib.decompress(data)
         obj = pickle.loads(pickled)
         if obj['type'] == 'REQUEST':
@@ -201,7 +202,7 @@ class ECSMgrPickle(ECSMgr):
         else:
             print('unparsed unicast message')
 
-    def _on_recv_flood(self, data):
+    def on_recv_flood(self, data):
         pickled = zlib.decompress(data)
         obj = pickle.loads(pickled)
         self.on_recv_ecs_flood_all(obj)

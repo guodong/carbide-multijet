@@ -9,6 +9,7 @@ from .topo import Topology
 DATADIR = 'configs/common'
 # DATADIR = 'results/common'
 
+
 class MockVerifierThread(ECSMgrPickle):
 
     def __init__(self, node_id, qs):
@@ -28,9 +29,9 @@ class MockVerifierThread(ECSMgrPickle):
             if msg['type']=='local_update':
                 self.update_local_rules(msg['rules'])
             elif msg['type']=='unicast':
-                self._on_recv_unicast(msg['data'], msg['recv_port'])
+                self.on_recv_unicast(msg['data'], msg['recv_port'])
             elif msg['type']=='flood':
-                self._on_recv_flood(msg['data'])
+                self.on_recv_flood(msg['data'])
             # self.dump_ecs()
 
     def unicast(self, msg, port):
