@@ -252,7 +252,8 @@ class RocketFuel:
                 self.ps()
             elif cmd == "exec":
                 line = raw_input('exec> ')
-                self.router_exec(line)
+                if line!="":
+                    self.router_exec(line)
             elif cmd == "":
                 pass
             else:
