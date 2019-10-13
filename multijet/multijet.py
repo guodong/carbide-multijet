@@ -10,7 +10,6 @@ from ryu.ofproto import ofproto_v1_3
 
 from trigger_server import TriggerServer
 from verifier import Verifier
-# from verifier_thread import VerifierThread as Verifier
 from utils import log
 
 
@@ -82,7 +81,7 @@ class Multijet(app_manager.RyuApp):
             v.dp = dp
 
         # init verify msg rules
-        ofmatch = parser.OFPMatch(eth_type=2048, ip_proto=MULTIJET_IP_PROTO)
+        ofmatch = parser.OFPMatch(eth_type=2048, ip_proto=Verifier.MULTIJET_IP_PROTO)
         actions = [parser.OFPActionOutput(ofp.OFPP_CONTROLLER, ofp.OFPCML_NO_BUFFER)]
         inst = [parser.OFPInstructionActions(ofp.OFPIT_APPLY_ACTIONS, actions)]
         msg = parser.OFPFlowMod(datapath=dp, priority=44444, match=ofmatch,
@@ -139,7 +138,7 @@ class Multijet(app_manager.RyuApp):
         in_port = ev.msg.match['in_port']
         pkt = packet.Packet(data=ev.msg.data)
         pkt_ip = pkt.get_protocol(ipv4.ipv4)
-        if not pkt_ip.proto == MULTIJET_IP_PROTO:
+        if not pkt_ip.proto == Verifier.MULTIJET_IP_PROTO:
             return
         payload = pkt.protocols[-1]
         msg = json.loads(payload)
