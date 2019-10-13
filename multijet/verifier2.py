@@ -57,6 +57,7 @@ class Verifier2(ECSMgrPickle):
                 # debug(msg)
             except Exception:
                 log(self.dump_ecs())
+                log(self.dump_assemble())
                 continue
             if msg['type'] == 'local_update':
                 self.update_local_rules(msg['rules'])
@@ -81,6 +82,13 @@ class Verifier2(ECSMgrPickle):
             end_offset = offset
             header = struct.pack(self.HEADER_FORMAT, self._cpid, self.node_id, seq_num, total_size, start_offset, end_offset)
             yield header+frag
+
+    def dump_assemble(self):
+        s = "dump assemble"
+        for node_id, bufs in self._reassemble_buf.items():
+            for msg_seq, buf in bufs:
+                s += "(%s,%d) "%(node_id, msg_seq)
+        return s
 
     def reassemble(self, in_port, proto, fragment):
         bufs = self._reassemble_buf.get(proto)
