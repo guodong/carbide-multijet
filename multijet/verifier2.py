@@ -85,9 +85,10 @@ class Verifier2(ECSMgrPickle):
 
     def dump_assemble(self):
         s = "dump assemble"
-        for node_id, bufs in self._reassemble_buf.items():
-            for msg_seq, buf in bufs.items():
-                s += "(%s,%d) "%(node_id, msg_seq)
+        for proto, bufs in self._reassemble_buf.items():
+            for node_id, node_bufs in bufs.items():
+                for msg_seq, buf in node_bufs.items():
+                    s += "(%d, %s,%d) "%(proto, node_id, msg_seq)
         return s
 
     def reassemble(self, in_port, proto, fragment):
