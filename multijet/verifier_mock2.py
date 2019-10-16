@@ -98,7 +98,7 @@ class MockPushPullECSMgr(PushPullECSMgr):
                 # debug(msg)
             except Exception:
                 log(self.dump_ecs())
-                # log(self.dump_assemble())
+                self.check()
                 break
             if msg['type'] == 'mock_trans':
                 self.transceiver.on_recv(msg['data'], msg['source'])
@@ -109,6 +109,9 @@ class MockPushPullECSMgr(PushPullECSMgr):
             elif msg['type'] == 'flood_neighbor':
                 self._on_recv_flood_neighbor(msg['data'])
 
+    def check(self):
+        if len(self._ecs_requests)>0:
+            log("error  %s %s"%(self.node_id, str(self._ecs_requests)))
 
 
 def load_rules(n):
