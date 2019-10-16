@@ -46,6 +46,13 @@ class Topology:
         p2 = self.links.get(port)
         return p2
 
+    def get_neighbor(self, node_id):
+        nodes = set()
+        for src, dst in self.links:
+            if src[0]==node_id:
+                nodes.add(dst[0])
+        return list(nodes)
+
     def spanning_tree(self):
         flags = {n: False for n in self.nodes.keys()}
         spanning_tree_ports = {n: [] for n in self.nodes.keys()}
