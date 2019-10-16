@@ -211,6 +211,7 @@ class PushPullECSMgr(BaseECSMgr):
                 break
             i += 1
         if i < len(r1):
+            assert i==1, "format error"
             if r2[0][1] is None:
                 return r1[:i]
             return r1[:i] + r2
