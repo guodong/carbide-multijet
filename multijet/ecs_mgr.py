@@ -341,7 +341,7 @@ class ECSMgr:
                 return r1[:i]
             return r1[:i] + r2
         r1_last = r1[-1]
-        assert self._topo.get_nexthop(r1_last[0], r1_last[1]) is not None
+        # assert self._topo.get_nexthop(r1_last[0], r1_last[1]) is not None
         if len(r1_last)==2 and self._topo.get_nexthop(r1_last[0], r1_last[1])==r2_n:
             return r1 + r2
         return None
