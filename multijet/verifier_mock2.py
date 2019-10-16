@@ -8,8 +8,8 @@ from .ecs_mgr import PushPullECSMgr
 from .topo import Topology
 from .transceiver import Transceiver
 
-DATADIR = 'configs/common'
-# DATADIR = 'results/common'
+# DATADIR = 'configs/common'
+DATADIR = 'ignored/common'
 
 
 class MockVerifierThread(ECSMgrPickle):
@@ -89,7 +89,7 @@ class MockPushPullECSMgr(PushPullECSMgr):
         log('start run')
         while True:
             try:
-                msg = self.queue.get(timeout=5)
+                msg = self.queue.get(timeout=20)
                 # debug(msg)
             except Exception:
                 log(self.dump_ecs())
@@ -103,6 +103,22 @@ class MockPushPullECSMgr(PushPullECSMgr):
                 self._on_recv_unicast(msg['data'], msg['recv_port'])
             elif msg['type'] == 'flood_neighbor':
                 self._on_recv_flood_neighbor(msg['data'])
+
+
+
+def load_rules(n):
+    rules = {}
+    with open(DATADIR+'/ospf%s.json'%str(n)) as f:
+        obj = json.load(f)
+        log('parse len = %d'%len(obj))
+        for flow in obj:
+            ip, mask = flow['match']['ipv4_dst']
+            output = int(flow['action']['output'])
+            space = str(ip)+'/24'
+            rules.setdefault(output, [])
+            rules[output].append(space)
+    return [(IPSet(space), port) for port,space in rules.items()]
+
 
 
 def main1():
@@ -119,8 +135,11 @@ def main1():
         proc = Process(target=t.run)
         proc.start()
         processes.append(proc)
+
+    all_rules = {n: load_rules(n) for n in topo.nodes}
+
     for n in topo.nodes.keys():
-        rules = load_rules(n)
+        rules = all_rules[n]
         log(rules)
         qs[n].put({
             'type': 'local_update',
@@ -130,17 +149,6 @@ def main1():
     for t in processes:
         t.join()
 
-def load_rules(n):
-    rules = {}
-    with open(DATADIR+'/ospf%s.json'%str(n)) as f:
-        obj = json.load(f)
-        for flow in obj:
-            ip, mask = flow['match']['ipv4_dst']
-            output = int(flow['action']['output'])
-            space = IPSet([ip+'/24'])
-            rules.setdefault(output, IPSet())
-            rules[output] |= space
-    return [(space, port) for port,space in rules.items()]
 
 def main():
     topo = Topology()
