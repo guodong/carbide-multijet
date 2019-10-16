@@ -60,7 +60,7 @@ class PushPullECSMgr(BaseECSMgr):
             elif msg['type'] == 'unicast':
                 self._on_recv_unicast(msg['data'], msg['recv_port'])
             elif msg['type'] == 'flood_neighbor':
-                self._on_recv_flood_neighbor(msg['data'])
+                self._on_recv_flood_neighbor(msg['data']['ecs'])
             # debug(self.dump_ecs())
 
     def on_recv(self, obj, source):

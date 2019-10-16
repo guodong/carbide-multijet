@@ -48,8 +48,8 @@ class Topology:
 
     def get_neighbor(self, node_id):
         nodes = set()
-        for src, dst in self.links:
-            if src[0]==node_id:
+        for src, dst in self.links.items():
+            if str(src[0])==str(node_id):
                 nodes.add(dst[0])
         return list(nodes)
 
