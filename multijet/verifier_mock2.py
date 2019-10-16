@@ -8,8 +8,8 @@ from .ecs_mgr import PushPullECSMgr
 from .topo import Topology
 from .transceiver import Transceiver
 
-# DATADIR = 'configs/common'
-DATADIR = 'ignored/common'
+DATADIR = 'configs/common'
+# DATADIR = 'ignored/common'
 
 
 class MockVerifierThread(ECSMgrPickle):
@@ -160,8 +160,11 @@ def main():
         proc = Process(target=t.run)
         proc.start()
         processes.append(proc)
+
+    all_rules = {n: load_rules(n) for n in topo.nodes}
+
     for n in topo.nodes.keys():
-        rules = load_rules(n)
+        rules = all_rules[n]
         log(rules)
         qs[n].put({
             'type': 'local_update',
@@ -173,4 +176,4 @@ def main():
 
 
 if __name__=='__main__':
-    main1()
+    main()
