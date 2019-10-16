@@ -84,6 +84,8 @@ class MockTransceiver(Transceiver):
                     'data': obj,
                     'source': ('flood_neighbor',)
                 })
+        else:
+            log("error send message")
 
     def on_recv(self, data, source):
         self._recv_callback(data, source)
@@ -108,6 +110,8 @@ class MockPushPullECSMgr(PushPullECSMgr):
                 self._on_recv_unicast(msg['data'], msg['recv_port'])
             elif msg['type'] == 'flood_neighbor':
                 self._on_recv_flood_neighbor(msg['data'])
+            else:
+                log("error message type")
 
     def check(self):
         if len(self._ecs_requests)>0:
