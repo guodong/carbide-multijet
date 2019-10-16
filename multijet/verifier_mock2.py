@@ -27,6 +27,7 @@ class MockVerifierThread(ECSMgrPickle):
                 msg = self.queue.get(timeout=10)
             except Exception:
                 log(self.dump_ecs())
+                self.check()
                 return
             if msg['type']=='local_update':
                 self.update_local_rules(msg['rules'])
@@ -35,6 +36,10 @@ class MockVerifierThread(ECSMgrPickle):
             elif msg['type']=='flood':
                 self.on_recv_flood(msg['data'])
             # self.dump_ecs()
+
+    def check(self):
+        if len(self._ecs_requests)>0:
+            log("error  %s %s"%(self.node_id, str(self._ecs_requests)))
 
     def unicast(self, msg, port):
         n, p = self._topo.get_nextport(self.node_id, port)
