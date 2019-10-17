@@ -72,7 +72,7 @@ class ReassembleTransceiver(LayeredTransceiver):
         sn = self._seq_nums.get(target, 0) + 1
         self._seq_nums[target] = sn
         for fragment in self._split_msg(data, sn):
-            self._out_trans.send(fragment, data)
+            self._out_trans.send(fragment, target)
 
     def _split_msg(self, data, seq_num):
         # cpid seq_num  total_size start_offset end_offset  fragment
