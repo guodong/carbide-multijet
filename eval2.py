@@ -138,6 +138,8 @@ class RocketFuel:
             c = self.containers[id]
             cmd1 = 'ovs-ofctl add-flow -OOpenFlow13 s priority=53333,ip,ip_proto=144,actions=output:controller'
             c.exec_run(cmd1)
+            cmd1 = 'ovs-ofctl add-flow -OOpenFlow13 s priority=53333,ip,ip_proto=143,actions=output:controller'
+            c.exec_run(cmd1)
             ps = [str(p) for p in ports[id]]
             ps.append('controller')
             pss = ','.join(ps)
