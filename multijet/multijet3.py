@@ -62,7 +62,7 @@ class PacketTransceiver(Transceiver):
         ofp = self._dp.ofproto
         parser = self._dp.ofproto_parser
         if target[0]=='unicast':
-            port = target[0]
+            port = target[1]
             actions = [parser.OFPActionOutput(port)]
             p = packet.Packet()
             eth_header = ethernet.ethernet()
