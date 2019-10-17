@@ -165,8 +165,8 @@ class Multijet3(app_manager.RyuApp):
         ofp = dp.ofproto
         parser = dp.ofproto_parser
         self._dp = dp
-        pkt_trans = PacketTransceiver(dp, self._flood_ports)
-        demux, trans = build_transceiver(self._cps, pkt_trans)
+        self._pkt_trans = PacketTransceiver(dp, self._flood_ports)
+        demux, trans = build_transceiver(self._cps, self._pkt_trans)
         for cpid in self._cps:
             q = Queue()
             self._qs[cpid] = q
@@ -205,4 +205,7 @@ class Multijet3(app_manager.RyuApp):
         debug("recv packet")
         in_port = ev.msg.match['in_port']
         pkt = packet.Packet(data=ev.msg.data)
+        if self._pkt_trans is None:
+            log('error self._pkt_trans is None')
+            return
         self._pkt_trans.on_recv(pkt, in_port)
