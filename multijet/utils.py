@@ -1,6 +1,6 @@
 import logging
 import datetime as dt
-
+import os
 
 class MyFormatter(logging.Formatter):
     converter = dt.datetime.fromtimestamp
@@ -17,8 +17,10 @@ class MyFormatter(logging.Formatter):
 
 logger = logging.getLogger(__name__)
 logger.setLevel(level=logging.INFO)
-# handler = logging.FileHandler("/etc/quagga/multijet2.log")
-handler = logging.StreamHandler()
+if os.path.exists('/common'):
+    handler = logging.FileHandler("/etc/quagga/multijet2.log")
+else:
+    handler = logging.StreamHandler()
 handler.setLevel(logging.DEBUG)
 formatter = MyFormatter(fmt='%(asctime)s %(created).6f %(message)s', datefmt='%Y-%m-%d,%H:%M:%S.%f')
 handler.setFormatter(formatter)
