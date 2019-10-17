@@ -166,7 +166,7 @@ class Multijet3(app_manager.RyuApp):
         parser = dp.ofproto_parser
         self._dp = dp
         pkt_trans = PacketTransceiver(dp, self._flood_ports)
-        trans = build_transceiver(self._cps, pkt_trans)
+        demux, trans = build_transceiver(self._cps, pkt_trans)
         for cpid in self._cps:
             q = Queue()
             self._qs[cpid] = q
