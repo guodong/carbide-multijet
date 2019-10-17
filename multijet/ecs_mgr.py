@@ -54,6 +54,7 @@ class PushPullECSMgr(BaseECSMgr):
             except Exception:
                 log(self.dump_ecs())
                 # log(self.dump_assemble())
+                self.check()
                 continue
             if msg['type'] == 'local_update':
                 self._update_local_rules(msg['rules'])
@@ -62,6 +63,10 @@ class PushPullECSMgr(BaseECSMgr):
             elif msg['type'] == 'flood_neighbor':
                 self._on_recv_flood_neighbor(msg['data']['ecs'])
             # debug(self.dump_ecs())
+
+    def check(self):
+        if len(self._ecs_requests)>0:
+            log('error len(self._ecs_requests)=%d'%(len(self._ecs_requests)))
 
     def on_recv(self, obj, source):
         # source  ('unicast', recv_port)   ('flood', )
