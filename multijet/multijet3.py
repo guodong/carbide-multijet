@@ -105,7 +105,7 @@ class PacketTransceiver(Transceiver):
                                       actions=actions, data=data)
             self._dp.send_msg(out)
         else:
-            log('error send packet')
+            log('error send packet %s'%(str(target)))
 
     def on_recv(self, pkt, in_port):
         pkt_ip = pkt.get_protocol(ipv4.ipv4)
