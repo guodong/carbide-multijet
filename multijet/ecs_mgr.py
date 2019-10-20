@@ -17,6 +17,12 @@ class EC:
     def empty(cls, route):
         return EC(route, IPSet())
 
+    def __repr__(self):
+        return str(self)
+
+    def __str__(self):
+        return "{%s <---> %s}"%(str(self.route), str(self.space))
+
 
 class BaseECSMgr(object):
     def __init__(self, node_id, queue, topo, transceiver):
@@ -226,40 +232,94 @@ class PushPullECSMgr(BaseECSMgr):
         return None
 
 
-class ECSMgr:
-    def __init__(self, node_id, topo):
-        self._ecs = {}  # type: {tuple: EC}
-        self.node_id = node_id
-        self._topo = topo  # type: Topology
-        # self._local_rules = {}
+class FloodECSMgr(BaseECSMgr):
+    def __init__(self, node_id, queue, topo, transceiver):
+        super(FloodECSMgr, self).__init__(node_id, queue, topo, transceiver)
         self._ecs_request_seq = 0
         self._ecs_requests = {}
 
-    def do_ecs_flood_all(self, ec_list): # type: ([EC]) ->None
-        raise NotImplementedError
+    def run(self):
+        log('start run')
+        while True:
+            try:
+                msg = self.queue.get(timeout=5)
+                # debug(msg)
+            except Exception:
+                log(self.dump_ecs())
+                self.check()
+                continue
+            if msg['type'] == 'local_update':
+                self.update_local_rules(msg['rules'])
+            elif msg['type'] == 'unicast':
+                self._on_recv_unicast(msg['data'], msg['recv_port'])
+            elif msg['type'] == 'flood':
+                self._on_recv_ecs_flood_all(msg['data'])
+            else:
+                log('error queue message type')
 
-    def do_ecs_request(self, seq, space, fwd_port):  # type: (int, IPSet, object)->None
-        raise NotImplementedError
+    def check(self):
+        if len(self._ecs_requests)>0:
+            log('error len(self._ecs_requests)=%d'%(len(self._ecs_requests)))
 
-    def do_ecs_reply(self, seq, ec_list, fwd_port):
-        raise NotImplementedError
+    def on_recv(self, obj, source):
+        # source  ('unicast', recv_port)   ('flood', )
+        if source[0]=='unicast':
+            self.queue.put({
+                'type': 'unicast',
+                'data': obj,
+                'recv_port': source[1]
+            })
+        elif source[0]=='flood':
+            self.queue.put({
+                'type': 'flood',
+                'data': obj
+            })
+        else:
+            log('error on_recv message type')
 
-    def on_recv_ecs_request(self, seq, space, recv_port):
+    def _do_ecs_flood_all(self, ec_list): # type: ([EC]) ->None
+        self.transceiver.send(ec_list, ('flood', ))
+
+    def _do_ecs_request(self, seq, space, fwd_port):  # type: (int, IPSet, object)->None
+        obj = {
+            'type': 'REQUEST',
+            'seq': seq,
+            'space': space
+        }
+        self.transceiver.send(obj, ('unicast', fwd_port))
+
+    def _do_ecs_reply(self, seq, ec_list, fwd_port):
+        obj = {
+            'type': 'REPLY',
+            'seq': seq,
+            'ecs': ec_list
+        }
+        self.transceiver.send(obj, ('unicast', fwd_port))
+
+    def _on_recv_unicast(self, obj, recv_port):
+        if obj['type'] == 'REQUEST':
+            self._on_recv_ecs_request(obj['seq'], obj['space'], recv_port)
+        elif obj['type'] == 'REPLY':
+            self._on_recv_ecs_reply(obj['seq'], obj['ecs'])
+        else:
+            print('unparsed unicast message')
+
+    def _on_recv_ecs_request(self, seq, space, recv_port):
         ec_list = []
         for r, ec in self._ecs.items():
             intersection = ec.space & space
             if len(intersection)>0:
                 ec_list.append(EC(r, intersection))
-        self.do_ecs_reply(seq, ec_list, recv_port)
+        self._do_ecs_reply(seq, ec_list, recv_port)
 
-    def on_recv_ecs_reply(self, seq, ec_list):  # type: (int, [EC]) ->None
+    def _on_recv_ecs_reply(self, seq, ec_list):  # type: (int, [EC]) ->None
         assert seq in self._ecs_requests
         space, fwd_port = self._ecs_requests[seq]
         self._ecs_requests.pop(seq)
         flood_ecs = {}
 
         # end host
-        port_network = self._topo.get_network(self.node_id, fwd_port)  # 1.0.0.1/24
+        port_network = self.topo.get_network(self.node_id, fwd_port)  # 1.0.0.1/24
         port_network = IPSet(IPNetwork(port_network).cidr)
         host_route_space = space & port_network
         if len(host_route_space)>0:
@@ -270,7 +330,7 @@ class ECSMgr:
 
         for recv_ec in ec_list:  # type: EC
             space -= recv_ec.space
-            assert self._topo.get_nexthop(self.node_id, fwd_port) == recv_ec.route[0][0], "error receive route"
+            assert self.topo.get_nexthop(self.node_id, fwd_port) == recv_ec.route[0][0], "error receive route"
             recv_route = ((self.node_id, fwd_port),) + recv_ec.route
             recv_space = recv_ec.space
             self._update_ecs(recv_route, recv_space)
@@ -287,9 +347,9 @@ class ECSMgr:
             assert unknown_route not in flood_ecs
             flood_ecs[unknown_route] = EC(unknown_route, space)
             self._update_ecs(unknown_route, space)
-        self.do_ecs_flood_all(list(flood_ecs.values()))
+        self._do_ecs_flood_all(list(flood_ecs.values()))
 
-    def on_recv_ecs_flood_all(self, ec_list):  # type: ([EC]) ->None
+    def _on_recv_ecs_flood_all(self, ec_list):  # type: ([EC]) ->None
         for recv_ec in ec_list:
             self._update_ecs(recv_ec.route, recv_ec.space)
 
@@ -328,7 +388,7 @@ class ECSMgr:
             if r12 is not None:
                 changed_space = ec.space & space
                 if len(changed_space)>0:
-                    ec.space-=changed_space
+                    ec.space -= changed_space
                     if len(ec.space)==0:
                         self._ecs.pop(r)
                     ec = self._ecs.setdefault(r12, EC.empty(r12))
@@ -348,7 +408,7 @@ class ECSMgr:
             return r1[:i] + r2
         r1_last = r1[-1]
         # assert self._topo.get_nexthop(r1_last[0], r1_last[1]) is not None
-        if len(r1_last)==2 and self._topo.get_nexthop(r1_last[0], r1_last[1])==r2_n:
+        if len(r1_last)==2 and self.topo.get_nexthop(r1_last[0], r1_last[1])==r2_n:
             return r1 + r2
         return None
 
@@ -361,66 +421,11 @@ class ECSMgr:
                 #     ec.space -= dst_match
                 # self.do_ecs_flood_all([EC(tmp_route, dst_match)])
                 self._update_ecs(tmp_route, dst_match)
-                self.do_ecs_flood_all([EC(tmp_route, dst_match)])
+                self._do_ecs_flood_all([EC(tmp_route, dst_match)])
             else:
                 self._ecs_request_hold(dst_match, fwd_port)
 
     def _ecs_request_hold(self, space, fwd_port):
         self._ecs_request_seq += 1
         self._ecs_requests[self._ecs_request_seq] = (space, fwd_port)
-        self.do_ecs_request(self._ecs_request_seq, space, fwd_port)
-
-    def dump_ecs(self):
-        s = "============%s==============\n"%self.node_id
-        for ec in self._ecs.values():
-            s += "%s <----> %s\n"%(str(ec.space), str(ec.route))
-        s += "============%s==============\n" % self.node_id
-        return s
-
-
-class ECSMgrPickle(ECSMgr):
-    def do_ecs_flood_all(self, ec_list):
-        pickled = pickle.dumps(ec_list, protocol=-1)
-        data = zlib.compress(pickled)
-        self.flood(data)
-
-    def do_ecs_request(self, seq, space, fwd_port):
-        obj = {
-            'type': 'REQUEST',
-            'seq': seq,
-            'space': space
-        }
-        pickled = pickle.dumps(obj, protocol=-1)
-        data = zlib.compress(pickled)
-        self.unicast(data, fwd_port)
-
-    def do_ecs_reply(self, seq, ec_list, fwd_port):
-        obj = {
-            'type': 'REPLY',
-            'seq': seq,
-            'ecs': ec_list
-        }
-        pickled = pickle.dumps(obj, protocol=-1)
-        data = zlib.compress(pickled)
-        self.unicast(data, fwd_port)
-
-    def on_recv_unicast(self, data, recv_port):
-        pickled = zlib.decompress(data)
-        obj = pickle.loads(pickled)
-        if obj['type'] == 'REQUEST':
-            self.on_recv_ecs_request(obj['seq'], obj['space'], recv_port)
-        elif obj['type'] == 'REPLY':
-            self.on_recv_ecs_reply(obj['seq'], obj['ecs'])
-        else:
-            print('unparsed unicast message')
-
-    def on_recv_flood(self, data):
-        pickled = zlib.decompress(data)
-        obj = pickle.loads(pickled)
-        self.on_recv_ecs_flood_all(obj)
-
-    def unicast(self, msg, port):
-        raise NotImplementedError
-
-    def flood(self, msg):
-        raise NotImplementedError
+        self._do_ecs_request(self._ecs_request_seq, space, fwd_port)

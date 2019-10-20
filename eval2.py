@@ -177,13 +177,6 @@ class RocketFuel:
             code, output = c.exec_run('ryu-manager multijet.multijet2', detach=True, environment=['PYTHONPATH=/'], workdir='/')
             print(output)
 
-    def start_ryu3(self):
-        for r in self.routers.values():
-            print 'start multijet3 for ' + r.id
-            c = self.containers[r.id]
-            code, output = c.exec_run('ryu-manager multijet.multijet3', detach=True, environment=['PYTHONPATH=/'], workdir='/')
-            print(output)
-
     def kill_ryu(self):
         for r in self.routers.values():
             print 'kill multijet2 for ' + r.id
@@ -257,8 +250,6 @@ class RocketFuel:
                 self.start_ryu2()
             elif cmd == 'kill':
                 self.kill_ryu()
-            elif cmd == 'start3':
-                self.start_ryu3()
             elif cmd == 'ps':
                 self.ps()
             elif cmd == "exec":
