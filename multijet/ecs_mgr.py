@@ -238,6 +238,7 @@ class FloodECSMgr(BaseECSMgr):
         self._ecs_request_seq = 0
         self._ecs_requests = {}
         self._tmp_save_flood_ecs = {}
+        self._last_updated_unknown_next_hosts = set()
 
     def run(self):
         log('start run')
@@ -325,7 +326,6 @@ class FloodECSMgr(BaseECSMgr):
         space, fwd_port = self._ecs_requests[seq]
         self._ecs_requests.pop(seq)
         flood_ecs = {}
-        unknown_host = set()
 
         # end host
         port_network = self.topo.get_network(self.node_id, fwd_port)  # 1.0.0.1/24
@@ -341,9 +341,6 @@ class FloodECSMgr(BaseECSMgr):
             space -= recv_ec.space
             assert self.topo.get_nexthop(self.node_id, fwd_port) == recv_ec.route[0][0], "error receive route"
             recv_route = ((self.node_id, fwd_port),) + recv_ec.route
-            if len(recv_route[-1])==2:
-                nn = self.topo.get_nexthop(recv_route[-1][0], recv_route[-1][1])
-                unknown_host.add(nn)
             recv_space = recv_ec.space
             self._update_local(recv_route, recv_space)
             if recv_route in flood_ecs:
@@ -356,22 +353,28 @@ class FloodECSMgr(BaseECSMgr):
 
         if len(space)>0:
             unknown_route = ((self.node_id, fwd_port),)
-            nn = self.topo.get_nexthop(self.node_id, fwd_port)
-            unknown_host.add(nn)
             assert unknown_route not in flood_ecs
             flood_ecs[unknown_route] = EC(unknown_route, space)
             self._update_local(unknown_route, space)
         self._do_ecs_flood_all(list(flood_ecs.values()))
 
-        for unknown_nexthop in unknown_host:
-            sn_save = self._tmp_save_flood_ecs.get(unknown_nexthop)
-            if sn_save:
-                now = time.time()
-                for t, obj in list(sn_save.items()):
-                    if now-t>5:
-                        sn_save.pop(t)
-                    else:
-                        self._on_recv_ecs_flood_all(obj)
+        self._fix_last_updated_unknown_next_hosts()
+
+    def _fix_last_updated_unknown_next_hosts(self):
+        while len(self._last_updated_unknown_next_hosts) > 0:
+            s = self._last_updated_unknown_next_hosts
+            self._last_updated_unknown_next_hosts = set()
+            for n in s:
+                sn_save = self._tmp_save_flood_ecs.get(n)
+                if sn_save:
+                    now = time.time()
+                    for t, obj in list(sn_save.items()):
+                        if now-t>5:
+                            sn_save.pop(t)
+                        else:
+                            ec_list = obj['ecs']
+                            for recv_ec in ec_list:
+                                self._update_remote(recv_ec.route, recv_ec.space)
 
     def _on_recv_ecs_flood_all(self, obj):  # type: ([EC]) ->None
         ec_list = obj['ecs']
@@ -385,16 +388,14 @@ class FloodECSMgr(BaseECSMgr):
         for recv_ec in ec_list:
             self._update_remote(recv_ec.route, recv_ec.space)
 
+        self._fix_last_updated_unknown_next_hosts()
+
     def _update_local(self, route, space):
         if route[0][1] is None:
-            # deleted_space = IPSet()
             for r, ec in list(self._ecs.items()):
-                # intersection = ec.space & space
-                # deleted_space |= intersection
                 ec.space -= space
                 if len(ec.space) == 0:
                     self._ecs.pop(r)
-            # return ((self.node_id, None), ), deleted_space
         else:
             self._ecs.setdefault(route, EC(route, IPSet()))
             self._ecs[route].space |= space
@@ -403,7 +404,10 @@ class FloodECSMgr(BaseECSMgr):
                     ec.space -= space
                     if len(ec.space) == 0:
                         self._ecs.pop(r)
-            # return route, space
+
+            if len(route[-1]) == 2:
+                n = self.topo.get_nexthop(route[-1][0], route[-1][1])
+                self._last_updated_unknown_next_hosts.add(n)
 
     def _update_remote(self, route, space):
         for r, ec in list(self._ecs.items()):
@@ -416,6 +420,10 @@ class FloodECSMgr(BaseECSMgr):
                         self._ecs.pop(r)
                     ec = self._ecs.setdefault(r12, EC.empty(r12))
                     ec.space |= changed_space
+
+                    if len(r12[-1]) == 2:
+                        n = self.topo.get_nexthop(r12[-1][0], r12[-1][1])
+                        self._last_updated_unknown_next_hosts.add(n)
 
     def _route_combine(self, r1, r2):
         assert len(r1) > 0 and len(r2) > 0 and r1[0][0] != r2[0][0], "format error"
