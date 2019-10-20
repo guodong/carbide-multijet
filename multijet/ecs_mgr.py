@@ -369,7 +369,7 @@ class FloodECSMgr(BaseECSMgr):
                 if sn_save:
                     now = time.time()
                     for t, obj in list(sn_save.items()):
-                        if now-t>5:
+                        if now-t>100:
                             # sn_save.pop(t)
                             pass
                         else:
@@ -383,7 +383,7 @@ class FloodECSMgr(BaseECSMgr):
         sn_save = self._tmp_save_flood_ecs.setdefault(source_node, collections.OrderedDict())
         now = time.time()
         for t in list(sn_save.keys()):
-            if now-t>5:
+            if now-t>100:
                 # sn_save.pop(t)
                 pass
         sn_save[now] = obj
