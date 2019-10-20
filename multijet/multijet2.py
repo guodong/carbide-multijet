@@ -93,7 +93,7 @@ class PacketTransceiver(Transceiver):
         elif target[0]=='flood':
             p = packet.Packet()
             eth_header = ethernet.ethernet()
-            ip_header = ipv4.ipv4(proto=self.FLOOD_NEIGHBOR)
+            ip_header = ipv4.ipv4(proto=self.FLOOD)
             ip_header.serialize(data, eth_header)
             p.add_protocol(eth_header)
             p.add_protocol(ip_header)

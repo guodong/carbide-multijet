@@ -259,7 +259,7 @@ class FloodECSMgr(BaseECSMgr):
 
     def check(self):
         if len(self._ecs_requests)>0:
-            log('error len(self._ecs_requests)=%d'%(len(self._ecs_requests)))
+            log('error len(self._ecs_requests)=%d' % (len(self._ecs_requests)))
 
     def on_recv(self, obj, source):
         # source  ('unicast', recv_port)   ('flood', )
