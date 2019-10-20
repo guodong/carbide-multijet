@@ -82,7 +82,7 @@ class MockFloodECSMgr(FloodECSMgr):
         while True:
             try:
                 msg = self.queue.get(timeout=5)
-                log(msg)
+                # log(msg)
             except Exception:
                 log(self.dump_ecs())
                 self.check()
