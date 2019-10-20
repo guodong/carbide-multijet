@@ -324,7 +324,7 @@ class FloodECSMgr(BaseECSMgr):
         host_route_space = space & port_network
         if len(host_route_space)>0:
             host_route = ((self.node_id, fwd_port, "host"),)
-            self._update_ecs(host_route, host_route_space)
+            self._update_local(host_route, host_route_space)
             flood_ecs[host_route] = EC(host_route, host_route_space)
             space -= host_route_space
 
@@ -333,7 +333,7 @@ class FloodECSMgr(BaseECSMgr):
             assert self.topo.get_nexthop(self.node_id, fwd_port) == recv_ec.route[0][0], "error receive route"
             recv_route = ((self.node_id, fwd_port),) + recv_ec.route
             recv_space = recv_ec.space
-            self._update_ecs(recv_route, recv_space)
+            self._update_local(recv_route, recv_space)
             if recv_route in flood_ecs:
                 flood_ecs[recv_route].space |= recv_space
             else:
@@ -346,21 +346,12 @@ class FloodECSMgr(BaseECSMgr):
             unknown_route = ((self.node_id, fwd_port),)
             assert unknown_route not in flood_ecs
             flood_ecs[unknown_route] = EC(unknown_route, space)
-            self._update_ecs(unknown_route, space)
+            self._update_local(unknown_route, space)
         self._do_ecs_flood_all(list(flood_ecs.values()))
 
     def _on_recv_ecs_flood_all(self, ec_list):  # type: ([EC]) ->None
         for recv_ec in ec_list:
-            self._update_ecs(recv_ec.route, recv_ec.space)
-
-    def _update_ecs(self, route, space):
-        # route:  ((self.node_id, None),  )  or None  ->   delete route space
-        #           (xxx, yyy)  -> update route space
-        assert len(route)>0
-        if route[0][0] == self.node_id:
-            self._update_local(route, space)
-        else:
-            self._update_remote(route, space)
+            self._update_remote(recv_ec.route, recv_ec.space)
 
     def _update_local(self, route, space):
         if route[0][1] is None:
@@ -420,7 +411,7 @@ class FloodECSMgr(BaseECSMgr):
                 # for route, ec in self._ecs:
                 #     ec.space -= dst_match
                 # self.do_ecs_flood_all([EC(tmp_route, dst_match)])
-                self._update_ecs(tmp_route, dst_match)
+                self._update_local(tmp_route, dst_match)
                 self._do_ecs_flood_all([EC(tmp_route, dst_match)])
             else:
                 self._ecs_request_hold(dst_match, fwd_port)

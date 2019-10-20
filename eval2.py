@@ -6,6 +6,8 @@ import time
 import urllib
 import urllib2
 import json
+import argparse
+from cmd import Cmd
 
 import docker
 import grequests
@@ -22,8 +24,12 @@ class Router:
         self.port_offset = 0
 
 
-class RocketFuel:
+class RocketFuel(Cmd):
+    intro = 'Welcome to the Multijet eval shell.   Type help or ? to list commands.\n'
+    prompt = 'multijet> '
+
     def __init__(self, filename='1755.r0.cch'):
+        Cmd.__init__(self)
         self.routers = {}
         self.links = []
         self.containers = {}
@@ -55,8 +61,13 @@ class RocketFuel:
                     if not exists:
                         self.links.append([r, n])
 
-    def start(self):
+    def attach(self):
+        for r in self.routers.values():
+            print 'get container ' + r.id
+            container = client.containers.get(r.id)
+            self.containers[r.id] = container
 
+    def start(self):
         # generate ospf config file
         self.gen_config()
 
@@ -152,61 +163,6 @@ class RocketFuel:
             c = self.containers[id]
             c.exec_run('/bootstrap/start.py', detach=True)
 
-    def start_ospf(self):
-        for r in self.routers.values():
-            print 'start ospf for ' + r.id
-            c = self.containers[r.id]
-            c.exec_run('zebra -d -f /etc/quagga/zebra.conf --fpm_format protobuf')
-            c.exec_run('ospfd -d -f /etc/quagga/ospfd.conf')
-
-        for r in self.routers.values():
-            print 'start fpm for ' + r.id
-            c = self.containers[r.id]
-            c.exec_run('python /fpm/main.py &', detach=True)
-
-    def start_ryu(self):
-        for r in self.routers.values():
-            print 'start multijet for ' + r.id
-            c = self.containers[r.id]
-            c.exec_run('ryu-manager /multijet/multijet.py', detach=True)
-
-    def start_ryu2(self):
-        for r in self.routers.values():
-            print 'start multijet2 for ' + r.id
-            c = self.containers[r.id]
-            code, output = c.exec_run('ryu-manager multijet.multijet2', detach=True, environment=['PYTHONPATH=/'], workdir='/')
-            print(output)
-
-    def kill_ryu(self):
-        for r in self.routers.values():
-            print 'kill multijet2 for ' + r.id
-            c = self.containers[r.id]
-            code, output = c.exec_run('pkill ryu')
-            print(output)
-
-    def ps(self):
-        for r in self.routers.values():
-            print 'ps cmd for ' + r.id
-            c = self.containers[r.id]
-            code, output = c.exec_run('ps')
-            print(output)
-
-    def router_exec(self, line):
-        for r in self.routers.values():
-            print('exec cmd %s for %s'%(line, str(r.id)))
-            c = self.containers[r.id]
-            code, output = c.exec_run(line)
-            print(output)
-
-    def stop(self, sig=None, frame=None):
-        print 'cleaning containers...'
-
-        for name in self.containers:
-            print("clean container %s"%name)
-            client.containers.get(name).remove(force=True)
-
-        exit(0)
-
     def gen_config(self):
         if os.path.exists('configs'):
             shutil.rmtree('configs')
@@ -235,38 +191,92 @@ class RocketFuel:
                 i = 0
             i = i + 1
 
-    def start_cli(self):
-        while True:
-            cmd = raw_input('multijet> ')
-            if cmd == 'test':
-                urls = []
-                for c in self.containers:
-                    ip = str(client.containers.get(c).attrs['NetworkSettings']['Networks']['bridge']['IPAddress'])
-                    urls.append('http://' + ip + ':8080/test')
-                rs = (grequests.get(u) for u in urls)
-                resps = grequests.map(rs)
-                print(resps)
-            elif cmd == 'start2':
-                self.start_ryu2()
-            elif cmd == 'kill':
-                self.kill_ryu()
-            elif cmd == 'ps':
-                self.ps()
-            elif cmd == "exec":
-                line = raw_input('exec> ')
-                if line!="":
-                    self.router_exec(line)
-            elif cmd == "":
-                pass
-            else:
-                print("unknown command")
+    def stop(self):
+        print 'cleaning containers...'
 
+        for name in self.containers:
+            print("clean container %s"%name)
+            client.containers.get(name).remove(force=True)
+
+        exit(0)
+
+    def emptyline(self):
+        return ""
+
+    def do_start_ospf(self, line):
+        for r in self.routers.values():
+            print 'start ospf for ' + r.id
+            c = self.containers[r.id]
+            c.exec_run('zebra -d -f /etc/quagga/zebra.conf --fpm_format protobuf')
+            c.exec_run('ospfd -d -f /etc/quagga/ospfd.conf')
+
+        for r in self.routers.values():
+            print 'start fpm for ' + r.id
+            c = self.containers[r.id]
+            c.exec_run('python /fpm/main.py &', detach=True)
+
+    def do_start_ryu(self, line):
+        for r in self.routers.values():
+            print 'start multijet for ' + r.id
+            c = self.containers[r.id]
+            c.exec_run('ryu-manager /multijet/multijet.py', detach=True)
+
+    def do_start_ryu2(self, line):
+        for r in self.routers.values():
+            print 'start multijet2 for ' + r.id
+            c = self.containers[r.id]
+            code, output = c.exec_run('ryu-manager multijet.multijet2', detach=True, environment=['PYTHONPATH=/'], workdir='/')
+            print(output)
+
+    def do_kill_ryu(self, line):
+        for r in self.routers.values():
+            print 'kill multijet2 for ' + r.id
+            c = self.containers[r.id]
+            code, output = c.exec_run('pkill ryu')
+            print(output)
+
+    def do_ps(self, line):
+        for r in self.routers.values():
+            print 'ps cmd for ' + r.id
+            c = self.containers[r.id]
+            code, output = c.exec_run('ps')
+            print(output)
+
+    def do_exec(self, line):
+        for r in self.routers.values():
+            print('exec cmd %s for %s'%(line, str(r.id)))
+            c = self.containers[r.id]
+            code, output = c.exec_run(line)
+            print(output)
+
+    def do_test(self, line):
+        print(line)
+        urls = []
+        for c in self.containers:
+            ip = str(client.containers.get(c).attrs['NetworkSettings']['Networks']['bridge']['IPAddress'])
+            urls.append('http://' + ip + ':8080/test')
+        rs = (grequests.get(u) for u in urls)
+        resps = grequests.map(rs)
+        print(resps)
+
+    def do_exit(self, line):
+        print('shell exit')
+        return True
+
+    def do_just_exit(self, line):
+        print('just exit')
+        exit(0)
 
 if __name__ == '__main__':
-    topofile = 'test.cch'
-    if len(sys.argv) > 1:
-        topofile = sys.argv[1]
-    topo = RocketFuel(topofile)
-    signal.signal(signal.SIGINT, topo.stop)
-    topo.start()
-    topo.start_cli()
+    parser = argparse.ArgumentParser(description="eval2")
+    parser.add_argument("-v", "--verbose", action="store_true")
+    parser.add_argument("-a", "--attach", action="store_true")
+    parser.add_argument("topo", type=str, help="topology file")
+    args = parser.parse_args()
+    topo = RocketFuel(args.topo)
+    if args.attach:
+        topo.attach()
+    else:
+        topo.start()
+    topo.cmdloop()
+    topo.stop()
