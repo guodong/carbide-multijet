@@ -260,41 +260,6 @@ class RocketFuel:
                 pass
             else:
                 print("unknown command")
-            # if cmd == 'fetch':
-            #     urls = []
-            #     for c in self.containers:
-            #         ip = str(client.containers.get(c).attrs['NetworkSettings']['Networks']['bridge']['IPAddress'])
-            #         urls.append('http://' + ip + ':6666/?type=get_rules')
-            #         # urllib2.urlopen('http://' + ip + ':6666/?type=get_rules')
-            #     rs = (grequests.get(u) for u in urls)
-            #     resps = grequests.map(rs)
-            #     print(resps)
-            # elif cmd == 'verify':
-            #     urls = []
-            #     try:
-            #         for c in self.containers:
-            #             ip = str(client.containers.get(c).attrs['NetworkSettings']['Networks']['bridge']['IPAddress'])
-            #             urls.append('http://' + ip + ':6666/?type=verify')
-            #             # urllib2.urlopen('http://' + ip + ':6666/?type=verify')
-            #         rs = (grequests.get(u) for u in urls)
-            #         resps = grequests.map(rs)
-            #         print(resps)
-            #     except Exception, e:
-            #         print e.message
-            #
-            # elif cmd == 'add rule':
-            #     node = raw_input('which node: ')
-            #     cp = raw_input('which control plane: ')
-            #     rule = raw_input(
-            #         'rule: ')  # eg: {"match": {"ipv4_dst": ["1.1.1.1", "255.255.255.0"]}, "action": {"output": 1}}
-            #     c = client.containers.get(node)
-            #     d = {
-            #         'type': 'add_rule',
-            #         'cp': cp,
-            #         'rule': rule
-            #     }
-            #     ip = str(c.attrs['NetworkSettings']['Networks']['bridge']['IPAddress'])
-            #     urllib2.urlopen('http://' + ip + ':6666/?' + urllib.urlencode(d))
 
 
 if __name__ == '__main__':

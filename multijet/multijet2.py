@@ -16,7 +16,7 @@ from ryu.ofproto import ofproto_v1_3
 
 from utils import log, debug
 from transceiver import Transceiver, build_transceiver
-from ecs_mgr import PushPullECSMgr
+from ecs_mgr import PushPullECSMgr, FloodECSMgr
 from topo import Topology
 
 
@@ -170,7 +170,7 @@ class Multijet2(app_manager.RyuApp):
         for cpid in self._cps:
             q = Queue()
             self._qs[cpid] = q
-            v = PushPullECSMgr(self._node_id, q, self._topo, trans[cpid])
+            v = FloodECSMgr(self._node_id, q, self._topo, trans[cpid])
             spawn(v.run)
 
     @set_ev_cls(ofp_event.EventOFPFlowStatsReply, MAIN_DISPATCHER)
