@@ -54,8 +54,9 @@ class PacketTransceiver(Transceiver):
     FLOOD_NEIGHBOR = 143
     FLOOD = 145
 
-    def __init__(self, dp, flood_ports):
+    def __init__(self, node_id, dp, flood_ports):
         super(PacketTransceiver, self).__init__()
+        self._node_id = node_id
         self._dp = dp
         self._flood_ports = flood_ports
 
@@ -92,6 +93,7 @@ class PacketTransceiver(Transceiver):
                                       actions=actions, data=data)
             self._dp.send_msg(out)
         elif target[0]=='flood':
+            data = struct.pack('8s', self._node_id) + data
             p = packet.Packet()
             eth_header = ethernet.ethernet()
             ip_header = ipv4.ipv4(proto=self.FLOOD)
@@ -112,15 +114,22 @@ class PacketTransceiver(Transceiver):
         pkt_ip = pkt.get_protocol(ipv4.ipv4)
         if not pkt_ip:
             return
+
         if pkt_ip.proto == self.UNICAST:
+            payload = pkt.protocols[-1]
             in_port = ('unicast', in_port)
         elif pkt_ip.proto == self.FLOOD_NEIGHBOR:
-            in_port = ('flood_neighbor',)
+            payload = pkt.protocols[-1]
+            in_port = ('flood_neighbor', in_port)
         elif pkt_ip.proto == self.FLOOD:
-            in_port = ('flood',)
+            payload = pkt.protocols[-1]
+            source_node_id = struct.unpack_from('8s', payload)[0]
+            source_node_id = str(source_node_id).strip('\x00')
+            payload = payload[8:]
+            in_port = ('flood', source_node_id)
         else:
             return
-        payload = pkt.protocols[-1]
+
         self._recv_callback(payload, in_port)
 
 
@@ -135,7 +144,7 @@ class Multijet2(app_manager.RyuApp):
         wsgi = kwargs['wsgi']
         wsgi.register(MultijetServer, {'app': self})
         self._dp = None
-        self._verifiers = {}
+        # self._verifiers = {}
         self._qs = {}
         self._cps = [100]
         self._node_id = platform.node()
@@ -156,6 +165,14 @@ class Multijet2(app_manager.RyuApp):
                 'type': 'local_update',
                 'rules': rules
             })
+        elif cmd == 'restart':
+            log('restart')
+            for q in self._qs.values():
+                q.put({
+                    'type': 'exit'
+                })
+            self._restart()
+
 
     @set_ev_cls(ofp_event.EventOFPStateChange, MAIN_DISPATCHER)
     def switch_in_handler(self, ev):
@@ -166,7 +183,9 @@ class Multijet2(app_manager.RyuApp):
         ofp = dp.ofproto
         parser = dp.ofproto_parser
         self._dp = dp
-        self._pkt_trans = PacketTransceiver(dp, self._flood_ports)
+
+    def _restart(self):
+        self._pkt_trans = PacketTransceiver(self._node_id, self._dp, self._flood_ports)
         demux, trans = build_transceiver(self._cps, self._pkt_trans)
         for cpid in self._cps:
             q = Queue()

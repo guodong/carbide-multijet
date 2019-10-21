@@ -68,6 +68,10 @@ class PushPullECSMgr(BaseECSMgr):
                 self._on_recv_unicast(msg['data'], msg['recv_port'])
             elif msg['type'] == 'flood_neighbor':
                 self._on_recv_flood_neighbor(msg['data']['ecs'])
+            elif msg['type'] == 'exit':
+                return
+            else:
+                log('error queue message type')
             # debug(self.dump_ecs())
 
     def check(self):
@@ -260,6 +264,8 @@ class FloodECSMgr(BaseECSMgr):
                 self._on_recv_unicast(msg['data'], msg['recv_port'])
             elif msg['type'] == 'flood':
                 self._on_recv_ecs_flood_all(msg['data'])
+            elif msg['type'] == 'exit':
+                return
             else:
                 log('error queue message type')
             try:
