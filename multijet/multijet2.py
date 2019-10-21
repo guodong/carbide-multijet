@@ -49,9 +49,10 @@ class MultijetServer(ControllerBase):
         return 'ok'
 
     @route('test', '/restart', methods=['GET'])
-    def test(self, req, **kwargs):
+    def restart(self, req, **kwargs):
         self._app.on_trigger('restart')
         return 'ok'
+
 
 class PacketTransceiver(Transceiver):
     UNICAST = 144

@@ -107,8 +107,9 @@ class ReassembleTransceiver(LayeredTransceiver):
             self._recv_callback(msg, source)
 
     def dump(self):
-        if len(self._reassemble_buf)>0:
-            return "error len(self._reassemble_buf)=%d" % len(self._reassemble_buf)
+        for source, d in self._reassemble_buf.items():
+            if len(d)>0:
+                return "error len(buf)=%d source=%s" % (len(d), str(source))
         return None
 
 
