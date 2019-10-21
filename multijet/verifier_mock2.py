@@ -58,7 +58,7 @@ class MockPushPullECSMgr(PushPullECSMgr):
         log('start run')
         while True:
             try:
-                msg = self.queue.get(timeout=20)
+                msg = self.queue.get(timeout=10)
                 # debug(msg)
             except Exception:
                 log(self.dump_ecs())
@@ -81,7 +81,7 @@ class MockFloodECSMgr(FloodECSMgr):
         log('start run')
         while True:
             try:
-                msg = self.queue.get(timeout=5)
+                msg = self.queue.get(timeout=10)
                 # log(msg)
             except Exception:
                 log(self.dump_ecs())
@@ -97,6 +97,8 @@ class MockFloodECSMgr(FloodECSMgr):
                 self._on_recv_ecs_flood_all(msg['data'])
             else:
                 log('error queue message type')
+            if self.queue.empty():
+                self._fix_last_updated_unknown_next_hosts()
 
 
 def load_rules(n):

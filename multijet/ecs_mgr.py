@@ -258,6 +258,8 @@ class FloodECSMgr(BaseECSMgr):
                 self._on_recv_ecs_flood_all(msg['data'])
             else:
                 log('error queue message type')
+            if self.queue.empty():
+                self._fix_last_updated_unknown_next_hosts()
 
     def check(self):
         if len(self._ecs_requests)>0:
@@ -358,7 +360,7 @@ class FloodECSMgr(BaseECSMgr):
             self._update_local(unknown_route, space)
         self._do_ecs_flood_all(list(flood_ecs.values()))
 
-        self._fix_last_updated_unknown_next_hosts()
+        # self._fix_last_updated_unknown_next_hosts()
 
     def _fix_last_updated_unknown_next_hosts(self):
         while len(self._last_updated_unknown_next_hosts) > 0:
@@ -390,7 +392,7 @@ class FloodECSMgr(BaseECSMgr):
         for recv_ec in ec_list:
             self._update_remote(recv_ec.route, recv_ec.space)
 
-        self._fix_last_updated_unknown_next_hosts()
+        # self._fix_last_updated_unknown_next_hosts()
 
     def _update_local(self, route, space):
         if route[0][1] is None:
