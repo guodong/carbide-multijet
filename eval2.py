@@ -259,6 +259,16 @@ class RocketFuel(Cmd):
         resps = grequests.map(rs)
         print(resps)
 
+    def do_restart(self, line):
+        print(line)
+        urls = []
+        for c in self.containers:
+            ip = str(client.containers.get(c).attrs['NetworkSettings']['Networks']['bridge']['IPAddress'])
+            urls.append('http://' + ip + ':8080/restart')
+        rs = (grequests.get(u) for u in urls)
+        resps = grequests.map(rs)
+        print(resps)
+
     def do_exit(self, line):
         print('shell exit')
         return True

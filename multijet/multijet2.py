@@ -48,6 +48,10 @@ class MultijetServer(ControllerBase):
         self._app.on_trigger('test')
         return 'ok'
 
+    @route('test', '/restart', methods=['GET'])
+    def test(self, req, **kwargs):
+        self._app.on_trigger('restart')
+        return 'ok'
 
 class PacketTransceiver(Transceiver):
     UNICAST = 144
@@ -183,6 +187,7 @@ class Multijet2(app_manager.RyuApp):
         ofp = dp.ofproto
         parser = dp.ofproto_parser
         self._dp = dp
+        self._restart()
 
     def _restart(self):
         self._pkt_trans = PacketTransceiver(self._node_id, self._dp, self._flood_ports)
