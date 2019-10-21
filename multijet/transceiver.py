@@ -16,6 +16,8 @@ class Transceiver(object):
 
     def on_recv(self, data, source): raise NotImplementedError
 
+    def dump(self): raise NotImplementedError
+
 
 class LayeredTransceiver(Transceiver):
     def __init__(self, out_trans):
@@ -26,6 +28,9 @@ class LayeredTransceiver(Transceiver):
     def send(self, obj, target): raise NotImplementedError
 
     def on_recv(self, data, source): raise NotImplementedError
+
+    def dump(self):
+        return self._out_trans.dump()
 
 
 class PickledZippedTransceiver(LayeredTransceiver):
@@ -100,6 +105,11 @@ class ReassembleTransceiver(LayeredTransceiver):
         if msg:
             source_bufs.pop(seq_num)
             self._recv_callback(msg, source)
+
+    def dump(self):
+        if len(self._reassemble_buf)>0:
+            return "error len(self._reassemble_buf)=%d" % len(self._reassemble_buf)
+        return None
 
 
 class DeMuxTransceiver(object):

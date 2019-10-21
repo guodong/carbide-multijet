@@ -251,6 +251,7 @@ class FloodECSMgr(BaseECSMgr):
                     # debug(msg)
                 except Exception:
                     log(self.dump_ecs())
+                    log(self.transceiver.dump())
                     self.check()
                     continue
             if msg['type'] == 'local_update':
