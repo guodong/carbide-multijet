@@ -452,16 +452,39 @@ class FloodECSMgr(BaseECSMgr):
 
     def update_local_rules(self, rules):
         # IPSet("1.0.1.0/24"), 1
+
+        # v1 code
+        # for dst_match, fwd_port in rules:  # type: IPSet, str
+        #     tmp_route = ((self.node_id, fwd_port),)
+        #     if fwd_port is None:
+        #         # for route, ec in self._ecs:
+        #         #     ec.space -= dst_match
+        #         # self.do_ecs_flood_all([EC(tmp_route, dst_match)])
+        #         self._update_local(tmp_route, dst_match)
+        #         self._do_ecs_flood_all([EC(tmp_route, dst_match)])
+        #     else:
+        #         self._ecs_request_hold(dst_match, fwd_port)
+
+        # v2 code
+        flood_ecs = []
         for dst_match, fwd_port in rules:  # type: IPSet, str
             tmp_route = ((self.node_id, fwd_port),)
             if fwd_port is None:
-                # for route, ec in self._ecs:
-                #     ec.space -= dst_match
-                # self.do_ecs_flood_all([EC(tmp_route, dst_match)])
                 self._update_local(tmp_route, dst_match)
-                self._do_ecs_flood_all([EC(tmp_route, dst_match)])
+                flood_ecs.append(EC(tmp_route, dst_match))
             else:
-                self._ecs_request_hold(dst_match, fwd_port)
+                port_network = self.topo.get_network(self.node_id, fwd_port)
+                port_network = IPSet(IPNetwork(port_network).cidr)
+                host_route_space = dst_match & port_network
+                if len(host_route_space) > 0:
+                    host_route = ((self.node_id, fwd_port, "host"),)
+                    self._update_local(host_route, host_route_space)
+                    flood_ecs.append(EC(host_route, host_route_space))
+                    dst_match -= host_route_space
+                if len(dst_match) > 0:
+                    self._ecs_request_hold(dst_match, fwd_port)
+        if len(flood_ecs) > 0:
+            self._do_ecs_flood_all(flood_ecs)
 
     def _ecs_request_hold(self, space, fwd_port):
         self._ecs_request_seq += 1
