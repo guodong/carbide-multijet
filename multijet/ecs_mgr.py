@@ -379,8 +379,9 @@ class FloodECSMgr(BaseECSMgr):
                 if sn_save:
                     now = time.time()
                     for t, obj in list(sn_save.items()):
-                        if now-t>50:
+                        if now-t > 50:
                             sn_save.pop(t)
+                            log("sn_save pop")
                         else:
                             ec_list = obj['ecs']
                             for recv_ec in ec_list:
@@ -391,9 +392,9 @@ class FloodECSMgr(BaseECSMgr):
         source_node = obj['source']
         sn_save = self._tmp_save_flood_ecs.setdefault(source_node, collections.OrderedDict())
         now = time.time()
-        for t in list(sn_save.keys()):
-            if now-t>50:
-                sn_save.pop(t)
+        # for t in list(sn_save.keys()):
+        #     if now-t>50:
+        #         sn_save.pop(t)
         sn_save[now] = obj
         for recv_ec in ec_list:
             self._update_remote(recv_ec.route, recv_ec.space)

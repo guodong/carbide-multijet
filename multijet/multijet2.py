@@ -1,5 +1,6 @@
 import json
 import struct
+import os
 import platform
 
 from eventlet import Queue
@@ -170,7 +171,10 @@ class Multijet2(app_manager.RyuApp):
         for cpid in self._cps:
             q = Queue()
             self._qs[cpid] = q
-            v = FloodECSMgr(self._node_id, q, self._topo, trans[cpid])
+            if os.path.exists('/common/pp'):
+                v = PushPullECSMgr(self._node_id, q, self._topo, trans[cpid])
+            else:
+                v = FloodECSMgr(self._node_id, q, self._topo, trans[cpid])
             spawn(v.run)
 
     @set_ev_cls(ofp_event.EventOFPFlowStatsReply, MAIN_DISPATCHER)
