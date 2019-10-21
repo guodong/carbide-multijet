@@ -239,6 +239,7 @@ class FloodECSMgr(BaseECSMgr):
         self._ecs_requests = {}
         self._tmp_save_flood_ecs = {}
         self._last_updated_unknown_next_hosts = set()
+        self._fix_last_updated_count = 0
 
     def run(self):
         log('start run')
@@ -267,6 +268,7 @@ class FloodECSMgr(BaseECSMgr):
         for ec in self._ecs.values():
             if len(ec.route[-1])==2:
                 log('error unreachable route %s'%(str(ec)))
+        log('self._fix_last_updated_count=%d'%self._fix_last_updated_count)
 
     def on_recv(self, obj, source):
         # source  ('unicast', recv_port)   ('flood', )
@@ -363,6 +365,7 @@ class FloodECSMgr(BaseECSMgr):
         # self._fix_last_updated_unknown_next_hosts()
 
     def _fix_last_updated_unknown_next_hosts(self):
+        self._fix_last_updated_count += 1
         while len(self._last_updated_unknown_next_hosts) > 0:
             s = self._last_updated_unknown_next_hosts
             self._last_updated_unknown_next_hosts = set()
