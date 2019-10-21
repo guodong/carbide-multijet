@@ -243,14 +243,16 @@ class FloodECSMgr(BaseECSMgr):
 
     def run(self):
         log('start run')
+        msg = None
         while True:
-            try:
-                msg = self.queue.get(timeout=5)
-                # debug(msg)
-            except Exception:
-                log(self.dump_ecs())
-                self.check()
-                continue
+            if msg is None:
+                try:
+                    msg = self.queue.get(timeout=5)
+                    # debug(msg)
+                except Exception:
+                    log(self.dump_ecs())
+                    self.check()
+                    continue
             if msg['type'] == 'local_update':
                 self.update_local_rules(msg['rules'])
             elif msg['type'] == 'unicast':
@@ -259,8 +261,11 @@ class FloodECSMgr(BaseECSMgr):
                 self._on_recv_ecs_flood_all(msg['data'])
             else:
                 log('error queue message type')
-            if self.queue.empty():
+            try:
+                msg = self.queue.get(timeout=0.01)
+            except Exception:
                 self._fix_last_updated_unknown_next_hosts()
+                msg = None
 
     def check(self):
         if len(self._ecs_requests)>0:
@@ -360,7 +365,7 @@ class FloodECSMgr(BaseECSMgr):
             assert unknown_route not in flood_ecs
             flood_ecs[unknown_route] = EC(unknown_route, space)
             self._update_local(unknown_route, space)
-        # self._do_ecs_flood_all(list(flood_ecs.values()))
+        self._do_ecs_flood_all(list(flood_ecs.values()))
 
         # self._fix_last_updated_unknown_next_hosts()
 

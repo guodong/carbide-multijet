@@ -1,4 +1,5 @@
 import json
+import sys
 from multiprocessing import Process, Queue
 
 from netaddr import IPSet
@@ -79,14 +80,16 @@ class MockPushPullECSMgr(PushPullECSMgr):
 class MockFloodECSMgr(FloodECSMgr):
     def run(self):
         log('start run')
+        msg = None
         while True:
-            try:
-                msg = self.queue.get(timeout=10)
-                # log(msg)
-            except Exception:
-                log(self.dump_ecs())
-                self.check()
-                break
+            if msg is None:
+                try:
+                    msg = self.queue.get(timeout=10)
+                    # log(msg)
+                except Exception:
+                    log(self.dump_ecs())
+                    self.check()
+                    break
             if msg['type'] == 'mock_trans':
                 self.transceiver.on_recv(msg['data'], msg['source'])
             elif msg['type'] == 'local_update':
@@ -97,8 +100,12 @@ class MockFloodECSMgr(FloodECSMgr):
                 self._on_recv_ecs_flood_all(msg['data'])
             else:
                 log('error queue message type')
-            if self.queue.empty():
+
+            try:
+                msg = self.queue.get(timeout=0.01)
+            except Exception:
                 self._fix_last_updated_unknown_next_hosts()
+                msg = None
 
 
 def load_rules(n):
@@ -115,15 +122,17 @@ def load_rules(n):
     return [(IPSet(space), port) for port,space in rules.items()]
 
 
-def main():
+def main(mgr):
     topo = Topology()
     topo.load(DATADIR + '/topo.json')
     qs = {n: Queue() for n in topo.nodes.keys()}
     mocks = {}
     for n in topo.nodes:
         t = MockTransceiver(n, qs, topo)
-        # mock = MockPushPullECSMgr(n, qs[n], topo, t)
-        mock = MockFloodECSMgr(n, qs[n], topo, t)
+        if mgr == 'pp':
+            mock = MockPushPullECSMgr(n, qs[n], topo, t)
+        else:
+            mock = MockFloodECSMgr(n, qs[n], topo, t)
         mocks[n] = mock
     processes = []
     for t in mocks.values():
@@ -146,4 +155,8 @@ def main():
 
 
 if __name__=='__main__':
-    main()
+    mgr = 'pp'
+    if len(sys.argv)>1:
+        if sys.argv[1] == 'flood':
+            mgr = 'flood'
+    main(mgr)
