@@ -332,14 +332,14 @@ class FloodECSMgr(BaseECSMgr):
         flood_ecs = {}
 
         # end host
-        port_network = self.topo.get_network(self.node_id, fwd_port)  # 1.0.0.1/24
-        port_network = IPSet(IPNetwork(port_network).cidr)
-        host_route_space = space & port_network
-        if len(host_route_space)>0:
-            host_route = ((self.node_id, fwd_port, "host"),)
-            self._update_local(host_route, host_route_space)
-            flood_ecs[host_route] = EC(host_route, host_route_space)
-            space -= host_route_space
+        # port_network = self.topo.get_network(self.node_id, fwd_port)  # 1.0.0.1/24
+        # port_network = IPSet(IPNetwork(port_network).cidr)
+        # host_route_space = space & port_network
+        # if len(host_route_space)>0:
+        #     host_route = ((self.node_id, fwd_port, "host"),)
+        #     self._update_local(host_route, host_route_space)
+        #     flood_ecs[host_route] = EC(host_route, host_route_space)
+        #     space -= host_route_space
 
         for recv_ec in ec_list:  # type: EC
             space -= recv_ec.space
@@ -360,7 +360,7 @@ class FloodECSMgr(BaseECSMgr):
             assert unknown_route not in flood_ecs
             flood_ecs[unknown_route] = EC(unknown_route, space)
             self._update_local(unknown_route, space)
-        self._do_ecs_flood_all(list(flood_ecs.values()))
+        # self._do_ecs_flood_all(list(flood_ecs.values()))
 
         # self._fix_last_updated_unknown_next_hosts()
 
