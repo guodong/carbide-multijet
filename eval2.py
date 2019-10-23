@@ -305,16 +305,22 @@ class RocketFuel(Cmd):
                 f.seek(0, 2)
                 self.watch_pos[n] = f.tell()
 
+        results = []
         for k, ks in rules.items():
             rules_once = {n: {k: output} for n, output in ks.items()}
             print('eval once')
             print(rules_once)
             self._eval_once(rules_once)
             time.sleep(5)
+            t1_mn = float('inf')
+            t2_mx = 0
             for n in ks.keys():
                 t2, t1 = self._watch_install_and_finish(n)
+                if t2_mx<t2: t2_mx = t2
+                if t1_mn>t1: t1_mn = t1
                 delta_t = t2 - t1
                 print('node %s update time %f'%(n, delta_t))
+            print('converge time %f'%(t2_mx - t1_mn))
 
     def _watch_install_and_finish(self, n):
         _, t1 = self._watch_wait_read(n, ('install',))
