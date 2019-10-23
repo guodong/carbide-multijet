@@ -38,7 +38,7 @@ class BaseECSMgr(object):
     def on_recv(self, data, source): raise NotImplementedError
 
     def dump_ecs(self):
-        s = "============%s==============\n"%self.node_id
+        s = "=======dumpecs===%s==============\n"%self.node_id
         for ec in self._ecs.values():
             s += "%s <----> %s\n"%(str(ec.space), str(ec.route))
         s += "============%s==============\n" % self.node_id
@@ -255,7 +255,7 @@ class FloodECSMgr(BaseECSMgr):
                     # debug(msg)
                 except Exception:
                     log(self.dump_ecs())
-                    log(self.transceiver.dump())
+                    log("self.transceiver.dump: %s" % str(self.transceiver.dump()))
                     self.check()
                     continue
             if msg['type'] == 'local_update':
@@ -269,10 +269,11 @@ class FloodECSMgr(BaseECSMgr):
             else:
                 log('error queue message type')
             try:
-                msg = self.queue.get(timeout=0.01)
+                msg = self.queue.get(timeout=0.00001)
             except Exception:
                 self._fix_last_updated_unknown_next_hosts()
                 msg = None
+            log('handle one message')
 
     def check(self):
         if len(self._ecs_requests)>0:

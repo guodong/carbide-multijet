@@ -5,6 +5,7 @@ import sys
 import time
 import urllib
 import urllib2
+import re
 import json
 import argparse
 from cmd import Cmd
@@ -222,11 +223,17 @@ class RocketFuel(Cmd):
             c.exec_run('ryu-manager /multijet/multijet.py', detach=True)
 
     def do_start_ryu2(self, line):
+        self.do_remove_log(None)
+
         for r in self.routers.values():
             print 'start multijet2 for ' + r.id
             c = self.containers[r.id]
             code, output = c.exec_run('ryu-manager multijet.multijet2', detach=True, environment=['PYTHONPATH=/'], workdir='/')
             print(output)
+
+    def do_remove_log(self, line):
+        for n in self.routers:
+            os.remove('configs/%s/multijet2.log'%n)
 
     def do_kill_ryu(self, line):
         for r in self.routers.values():
@@ -267,6 +274,97 @@ class RocketFuel(Cmd):
             urls.append('http://' + ip + ':8080/restart')
         rs = (grequests.get(u) for u in urls)
         resps = grequests.map(rs)
+        print(resps)
+
+    def do_test_ready(self, line):
+        for n in self.routers:
+            with open('configs/%s/multijet2.log' % n) as f:
+                s = f.read()
+                # print(s)
+                if 'start run' not in s:
+                    print('node %s not ready' % n)
+        print('test ready done!')
+
+    def do_eval(self, line):
+        rules = {}
+        for n in self.routers:
+            with open('configs/common/ospf%s.json' % str(n)) as f:
+                obj = json.load(f)
+                for flow in obj:
+                    ip, mask = flow['match']['ipv4_dst']
+                    output = int(flow['action']['output'])
+                    k = ip + '/24'
+                    ks = rules.setdefault(k, {})
+                    ks[n] = output
+
+        self.container_ip = {n: str(client.containers.get(n).attrs['NetworkSettings']['Networks']['bridge']['IPAddress'])
+                        for n in self.routers}
+        self.watch_pos = {}
+        for n in self.routers:
+            with open('configs/%s/multijet2.log' % n) as f:
+                f.seek(0, 2)
+                self.watch_pos[n] = f.tell()
+
+        for k, ks in rules.items():
+            rules_once = {n: {k: output} for n, output in ks.items()}
+            print('eval once')
+            print(rules_once)
+            self._eval_once(rules_once)
+            time.sleep(5)
+            for n in ks.keys():
+                t2, t1 = self._watch_install_and_finish(n)
+                delta_t = t2 - t1
+                print('node %s update time %f'%(n, delta_t))
+
+    def _watch_install_and_finish(self, n):
+        _, t1 = self._watch_wait_read(n, ('install',))
+        last_t2 = None
+        while True:
+            words = ('handle one message', '=======dumpecs')
+            w, t2 = self._watch_wait_read(n, words)
+            if w == words[0]:
+                last_t2 = t2
+            else:
+                break
+        return last_t2,  t1
+
+    def _watch_wait_read(self, n, words):
+        while True:
+            t = self._watch_for(n, words)
+            if t is None:
+                time.sleep(1)
+            else:
+                break
+        return t
+
+    def _watch_for(self, n, words):
+        with open('configs/%s/multijet2.log' % n) as f:
+            pos = self.watch_pos[n]
+            f.seek(pos)
+            while True:
+                line = f.readline()
+                self.watch_pos[n] = f.tell()
+                if line == "":
+                    self.watch_pos[n] = f.tell()
+                    return None
+                for word in words:
+                    if word in line:
+                        return word, self._parse_log_time(line)
+
+    def _parse_log_time(self, line):
+        b = next(re.finditer(' (\d+\.\d+) ', line))
+        t_str = b.groups()[0]
+        return float(t_str)
+
+    def _eval_once(self, rules):
+        reqs = []
+        for n, rs in rules.items():
+            ip = self.container_ip[n]
+            url = 'http://' + ip + ':8080/install'
+            d = rs
+            req = grequests.post(url, json=d)
+            reqs.append(req)
+        resps = grequests.map(reqs)
         print(resps)
 
     def do_exit(self, line):

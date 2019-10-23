@@ -23,7 +23,7 @@ from topo import Topology
 
 def load_rules(n):
     rules = {}
-    with open('/common/ospf%s.json'%str(n)) as f:
+    with open('/common/ospf%s.json' % str(n)) as f:
         obj = json.load(f)
         for flow in obj:
             ip, mask = flow['match']['ipv4_dst']
@@ -52,6 +52,12 @@ class MultijetServer(ControllerBase):
     def restart(self, req, **kwargs):
         self._app.on_trigger('restart')
         return 'ok'
+
+    @route('test', '/install', methods=['POST'])
+    def install(self, req, **kwargs):
+        data = req.json
+        print(data)
+        self._app.on_trigger('install', data = data)
 
 
 class PacketTransceiver(Transceiver):
@@ -162,7 +168,7 @@ class Multijet2(app_manager.RyuApp):
             _spanning_tree = json.load(f)
             self._flood_ports = _spanning_tree[self._node_id]
 
-    def on_trigger(self, cmd):
+    def on_trigger(self, cmd, **kwargs):
         if cmd == 'test':
             log('test start')
             rules = load_rules(self._node_id)
@@ -177,7 +183,18 @@ class Multijet2(app_manager.RyuApp):
                     'type': 'exit'
                 })
             self._restart()
-
+        elif cmd == 'install':
+            log('install')
+            data = kwargs['data']
+            rules = {}
+            for ip, output in data.items():
+                rules.setdefault(output, [])
+                rules[output].append(ip)
+            rules1 = [(IPSet(ip_list), output) for output, ip_list in rules.items()]
+            self._qs[100].put({
+                'type': 'local_update',
+                'rules': rules1
+            })
 
     @set_ev_cls(ofp_event.EventOFPStateChange, MAIN_DISPATCHER)
     def switch_in_handler(self, ev):

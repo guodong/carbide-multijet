@@ -55,6 +55,7 @@ class _Buffer:
     def pad(self, start, end, fragment):
         self.buf[start: end] = fragment
         self.pad_size += end-start
+        assert not self.pad_size > len(self.buf), "self.pad_size > len(self.buf)"
 
     def get_if_full(self):
         debug("pad_size=%d len=%d"%(self.pad_size, len(self.buf)))
