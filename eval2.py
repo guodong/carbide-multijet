@@ -324,7 +324,7 @@ class RocketFuel(Cmd):
 
         results = []
         num = 0
-        for k, ks in rules.items():
+        for k, ks in sorted(rules.items()):
             rules_once = {n: {k: output} for n, output in ks.items()}
             print('eval once')
             print(rules_once)
