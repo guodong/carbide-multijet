@@ -73,6 +73,7 @@ class PushPullECSMgr(BaseECSMgr):
             else:
                 log('error queue message type')
             # debug(self.dump_ecs())
+            log('handle one message')
 
     def check(self):
         if len(self._ecs_requests)>0:

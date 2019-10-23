@@ -233,7 +233,9 @@ class RocketFuel(Cmd):
 
     def do_remove_log(self, line):
         for n in self.routers:
-            os.remove('configs/%s/multijet2.log'%n)
+            log_file_path = 'configs/%s/multijet2.log' % n
+            if os.path.exists(log_file_path):
+                os.remove(log_file_path)
 
     def do_kill_ryu(self, line):
         for r in self.routers.values():
@@ -285,7 +287,22 @@ class RocketFuel(Cmd):
                     print('node %s not ready' % n)
         print('test ready done!')
 
+    def do_eval_2times(self, line):
+        self.do_start_ryu2('')
+        time.sleep(20)
+        self.do_eval('flood.log')
+        self.do_kill_ryu('')
+        os.system('touch configs/common/pp')
+        self.do_start_ryu2('')
+        time.sleep(20)
+        self.do_eval('pp.log')
+        self.do_kill_ryu('')
+
     def do_eval(self, line):
+        if line is None or line == "":
+            print('please give a log file name')
+            return
+        result_file_name = str(line).strip()
         rules = {}
         for n in self.routers:
             with open('configs/common/ospf%s.json' % str(n)) as f:
@@ -306,6 +323,7 @@ class RocketFuel(Cmd):
                 self.watch_pos[n] = f.tell()
 
         results = []
+        num = 0
         for k, ks in rules.items():
             rules_once = {n: {k: output} for n, output in ks.items()}
             print('eval once')
@@ -314,13 +332,34 @@ class RocketFuel(Cmd):
             time.sleep(5)
             t1_mn = float('inf')
             t2_mx = 0
+            detail = {}
             for n in ks.keys():
                 t2, t1 = self._watch_install_and_finish(n)
                 if t2_mx<t2: t2_mx = t2
                 if t1_mn>t1: t1_mn = t1
                 delta_t = t2 - t1
                 print('node %s update time %f'%(n, delta_t))
-            print('converge time %f'%(t2_mx - t1_mn))
+                detail[n] = {
+                    't1': t1,
+                    't2': t2,
+                    'delta': delta_t
+                }
+
+            delta_t = t2_mx - t1_mn
+            print('converge time %f'% delta_t)
+
+            results.append({
+                'rules': rules_once,
+                'num': num,
+                't2': t2_mx,
+                't1': t1_mn,
+                'delta': delta_t,
+                'detail': detail
+            })
+            num += 1
+
+            with open(result_file_name, 'w') as f:
+                json.dump(results, f, indent=2)
 
     def _watch_install_and_finish(self, n):
         _, t1 = self._watch_wait_read(n, ('install',))
