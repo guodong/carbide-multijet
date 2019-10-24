@@ -56,6 +56,7 @@ class PushPullECSMgr(BaseECSMgr):
         while True:
             try:
                 msg = self.queue.get(timeout=5)
+                log('handle one message')
                 # debug(msg)
             except Exception:
                 log(self.dump_ecs())
@@ -219,6 +220,7 @@ class PushPullECSMgr(BaseECSMgr):
         return ret
 
     def _route_combine(self, r1, r2):
+        print('r1', r1, 'r2', r2)
         assert len(r1) > 0 and len(r2) > 0 and r1[0][0] != r2[0][0], "format error"
         r2_n = r2[0][0]
         i = 1
@@ -227,12 +229,14 @@ class PushPullECSMgr(BaseECSMgr):
                 break
             i += 1
         if i < len(r1):
-            assert i==1, "format error"
+            # assert i==1, "format error" TODO:
+            if i!=1:
+                return None
             if r2[0][1] is None:
                 return r1[:i]
             return r1[:i] + r2
         r1_last = r1[-1]
-        if len(r1_last) == 2 and self.topo.get_nexthop(r1_last[0], r1_last[1]) == r2_n:
+        if len(r1_last) == 2 and self.topo.get_nexthop(r1_last[0], r1_last[1]) == r2_n and r2[0][1] is not None:
             return r1 + r2
         return None
 
@@ -253,6 +257,7 @@ class FloodECSMgr(BaseECSMgr):
             if msg is None:
                 try:
                     msg = self.queue.get(timeout=5)
+                    log('handle one message')
                     # debug(msg)
                 except Exception:
                     log(self.dump_ecs())
@@ -388,7 +393,7 @@ class FloodECSMgr(BaseECSMgr):
                 if sn_save:
                     now = time.time()
                     for t, obj in list(sn_save.items()):
-                        if now-t > 50:
+                        if now-t > 5:
                             sn_save.pop(t)
                             log("sn_save pop")
                         else:
@@ -433,6 +438,8 @@ class FloodECSMgr(BaseECSMgr):
         for r, ec in list(self._ecs.items()):
             r12 = self._route_combine(r, route)
             if r12 is not None and r12 != r:
+                # if r12[-1][1] is None:
+                #     log('route=%s space=%s  r=%s r12=%s'%(str(route), str(space), str(r), str(r12)))
                 changed_space = ec.space & space
                 if len(changed_space)>0:
                     ec.space -= changed_space
@@ -459,7 +466,7 @@ class FloodECSMgr(BaseECSMgr):
             return r1[:i] + r2
         r1_last = r1[-1]
         # assert self._topo.get_nexthop(r1_last[0], r1_last[1]) is not None
-        if len(r1_last)==2 and self.topo.get_nexthop(r1_last[0], r1_last[1])==r2_n:
+        if len(r1_last)==2 and self.topo.get_nexthop(r1_last[0], r1_last[1])==r2_n and r2[0][1] is not None:
             return r1 + r2
         return None
 

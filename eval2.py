@@ -9,11 +9,14 @@ import re
 import json
 import argparse
 from cmd import Cmd
+import random
 
 import docker
 import grequests
 
 import utils
+
+from multijet.topo import Topology
 
 client = docker.from_env()
 
@@ -68,6 +71,9 @@ class RocketFuel(Cmd):
             container = client.containers.get(r.id)
             self.containers[r.id] = container
 
+        self.topo = Topology()
+        self.topo.load('configs/common/topo.json')
+
     def start(self):
         # generate ospf config file
         self.gen_config()
@@ -86,7 +92,6 @@ class RocketFuel(Cmd):
 
         time.sleep(3)
 
-        from multijet.topo import Topology
         topo = Topology()
         topo.nodes = {r.id: {} for r in self.routers.values()}
 
@@ -140,6 +145,8 @@ class RocketFuel(Cmd):
             i = i + 1
 
         topo.save('configs/common/topo.json')
+        self.topo = topo
+
         ports = topo.spanning_tree()
         print(ports)
         with open("configs/common/spanningtree.json", 'w') as f:
@@ -362,7 +369,7 @@ class RocketFuel(Cmd):
                 json.dump(results, f, indent=2)
 
     def _watch_install_and_finish(self, n):
-        _, t1 = self._watch_wait_read(n, ('install',))
+        _, t1 = self._watch_wait_read(n, ('handle one message',))
         last_t2 = None
         while True:
             words = ('handle one message', '=======dumpecs')
@@ -412,6 +419,136 @@ class RocketFuel(Cmd):
         resps = grequests.map(reqs)
         print(resps)
 
+    def _reset_watch_pos(self):
+        for n in self.routers:
+            with open('configs/%s/multijet2.log' % n) as f:
+                f.seek(0, 2)
+                self.watch_pos[n] = f.tell()
+
+    def do_eval2_2times(self, line):
+        os.system('rm -f configs/common/pp')
+        self.do_start_ryu2('')
+        time.sleep(20)
+        self.do_eval2('flood-node.log')
+        self.do_kill_ryu('')
+        os.system('touch configs/common/pp')
+        self.do_start_ryu2('')
+        time.sleep(20)
+        self.do_eval('pp-node.log')
+        self.do_kill_ryu('')
+
+    def do_eval2(self, line):
+        if line is None or line == "":
+            print('please give a log file name')
+            return
+        result_file_name = str(line).strip()
+
+        self.container_ip = {
+            n: str(client.containers.get(n).attrs['NetworkSettings']['Networks']['bridge']['IPAddress'])
+            for n in self.routers }
+
+        self.watch_pos = {}
+
+
+        results = []
+        num = 0
+        path = []
+        ip = ""
+        for i in range(150):
+            # rules_once = {n: {k: output} for n, output in ks.items()}
+            if i%3 == 0:
+                path = self._random_select_path(i//3)  # [(node, output)]
+                ip = '99.0.%d.0/24'% (i//3)
+                rules_once = {n: {ip: output} for n, output in path}
+                eval_type = 'path'
+                watched_nodes = list(n for n,output in path)
+            elif i%3 == 1:
+                eval_type = 'delete'
+                rules_once = {path[-1][0]: {ip: None}}
+            else:
+                eval_type = 'add'
+                rules_once = {path[-1][0]: {ip: path[-1][1]}}
+
+            self._reset_watch_pos()
+
+            print('eval once')
+            print(rules_once)  # {node_id:  {'match': output_port}}
+            self._eval_once(rules_once)
+            time.sleep(5)
+            t1_mn = float('inf')
+            t2_mx = 0
+            detail = {}
+            for n in watched_nodes:
+                t2, t1 = self._watch_install_and_finish(n)
+                if t2_mx < t2: t2_mx = t2
+                if t1_mn > t1: t1_mn = t1
+                delta_t = t2 - t1
+                print('t1', t1, 't2', t2)
+                print('node %s update time %f' % (n, delta_t))
+                detail[n] = {
+                    't1': t1,
+                    't2': t2,
+                    'delta': delta_t
+                }
+
+            delta_t = t2_mx - t1_mn
+            print('converge time %f' % delta_t)
+
+            results.append({
+                'rules': rules_once,
+                'num': num,
+                't2': t2_mx,
+                't1': t1_mn,
+                'delta': delta_t,
+                'detail': detail,
+                'type': eval_type,
+                'path': path,
+                'pathlen': len(path)
+            })
+            num += 1
+
+            with open(result_file_name, 'w') as f:
+                json.dump(results, f, indent=2)
+
+    def _random_select_path(self, i):
+        with open('configs/common/random_path.json') as f:
+            data = json.load(f)
+        return [(str(n), int(output)) for n,output in data[i]]
+
+    def do_dump_random_path(self, line):
+        paths = []
+        try:
+            num = int(line)
+        except:
+            print('error argument')
+            return
+        while len(paths) < num:
+            start = len(self.topo.nodes) // 3 + 1
+            end = start * 2
+            select_len = start + len(paths) % (end - start + 1)
+            nodes = list(self.topo.nodes.keys())
+            r1 = random.randint(0, len(nodes)-1)
+            sn = nodes[r1]
+            path = []
+            flags = {n: False for n in nodes}
+            print('select_len', select_len)
+            while len(path) < select_len:
+                flags[sn] = True
+                nsn = [(p1, p2[0]) for p1, p2 in self.topo.links.items() if p1[0]==sn and flags[p2[0]]==False]
+                if len(nsn)==0:
+                    break
+                r2 = random.randint(0, len(nsn)-1)
+                ns = nsn[r2]
+                path.append(ns[0])
+                sn = ns[1]
+                print('path', path)
+
+            if len(path)>= start:
+                paths.append(path)
+            print('len(paths)', len(paths))
+        with open('configs/common/random_path.json', 'w') as f:
+            json.dump(paths, f, indent=2)
+
     def do_exit(self, line):
         print('shell exit')
         return True
@@ -419,6 +556,7 @@ class RocketFuel(Cmd):
     def do_just_exit(self, line):
         print('just exit')
         exit(0)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="eval2")
