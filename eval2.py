@@ -297,12 +297,12 @@ class RocketFuel(Cmd):
     def do_eval_2times(self, line):
         self.do_start_ryu2('')
         time.sleep(20)
-        self.do_eval('flood.log')
+        self.do_eval('flood-ospf.log')
         self.do_kill_ryu('')
         os.system('touch configs/common/pp')
         self.do_start_ryu2('')
         time.sleep(20)
-        self.do_eval('pp.log')
+        self.do_eval('pp-ospf.log')
         self.do_kill_ryu('')
 
     def do_eval(self, line):
@@ -434,7 +434,7 @@ class RocketFuel(Cmd):
         os.system('touch configs/common/pp')
         self.do_start_ryu2('')
         time.sleep(20)
-        self.do_eval('pp-node.log')
+        self.do_eval2('pp-node.log')
         self.do_kill_ryu('')
 
     def do_eval2(self, line):

@@ -263,6 +263,7 @@ class FloodECSMgr(BaseECSMgr):
                     log(self.dump_ecs())
                     log("self.transceiver.dump: %s" % str(self.transceiver.dump()))
                     self.check()
+                    self._reset_tmp_save_flood_ecs()
                     continue
             if msg['type'] == 'local_update':
                 self.update_local_rules(msg['rules'])
@@ -280,6 +281,10 @@ class FloodECSMgr(BaseECSMgr):
                 self._fix_last_updated_unknown_next_hosts()
                 msg = None
             log('handle one message')
+
+    def _reset_tmp_save_flood_ecs(self):
+        self._tmp_save_flood_ecs = {}
+        log('reset self._tmp_save_flood_ecs')
 
     def check(self):
         if len(self._ecs_requests)>0:
@@ -393,7 +398,7 @@ class FloodECSMgr(BaseECSMgr):
                 if sn_save:
                     now = time.time()
                     for t, obj in list(sn_save.items()):
-                        if now-t > 5:
+                        if now-t > 500:
                             sn_save.pop(t)
                             log("sn_save pop")
                         else:
