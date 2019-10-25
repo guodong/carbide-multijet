@@ -295,6 +295,7 @@ class RocketFuel(Cmd):
         print('test ready done!')
 
     def do_eval_2times(self, line):
+        os.system('rm -f configs/common/pp')
         self.do_start_ryu2('')
         time.sleep(20)
         self.do_eval('flood-ospf.log')
@@ -341,7 +342,7 @@ class RocketFuel(Cmd):
             t2_mx = 0
             detail = {}
             for n in ks.keys():
-                t2, t1 = self._watch_install_and_finish(n)
+                t2, t1, stat = self._watch_install_and_finish(n)
                 if t2_mx<t2: t2_mx = t2
                 if t1_mn>t1: t1_mn = t1
                 delta_t = t2 - t1
@@ -349,7 +350,8 @@ class RocketFuel(Cmd):
                 detail[n] = {
                     't1': t1,
                     't2': t2,
-                    'delta': delta_t
+                    'delta': delta_t,
+                    'stat': stat
                 }
 
             delta_t = t2_mx - t1_mn
@@ -369,16 +371,24 @@ class RocketFuel(Cmd):
                 json.dump(results, f, indent=2)
 
     def _watch_install_and_finish(self, n):
-        _, t1 = self._watch_wait_read(n, ('handle one message',))
+        _, t1, _ = self._watch_wait_read(n, ('handle one message',))
         last_t2 = None
         while True:
             words = ('handle one message', '=======dumpecs')
-            w, t2 = self._watch_wait_read(n, words)
+            w, t2, _ = self._watch_wait_read(n, words)
             if w == words[0]:
                 last_t2 = t2
             else:
                 break
-        return last_t2,  t1
+        _, _, line = self._watch_wait_read(n, ('self.transceiver.dump',))
+
+        return last_t2,  t1, self._parse_statistics(line)
+
+    def _parse_statistics(self, line):
+        send, recv = re.findall('=\[(\d+), (\d+), (\d+), (\d+), (\d+), (\d+)\]', line)
+        send = [int(a) for a in send]
+        recv = [int(a) for a in recv]
+        return send, recv
 
     def _watch_wait_read(self, n, words):
         while True:
@@ -401,7 +411,7 @@ class RocketFuel(Cmd):
                     return None
                 for word in words:
                     if word in line:
-                        return word, self._parse_log_time(line)
+                        return word, self._parse_log_time(line), line
 
     def _parse_log_time(self, line):
         b = next(re.finditer(' (\d+\.\d+) ', line))
@@ -479,7 +489,7 @@ class RocketFuel(Cmd):
             t2_mx = 0
             detail = {}
             for n in watched_nodes:
-                t2, t1 = self._watch_install_and_finish(n)
+                t2, t1, stat = self._watch_install_and_finish(n)
                 if t2_mx < t2: t2_mx = t2
                 if t1_mn > t1: t1_mn = t1
                 delta_t = t2 - t1

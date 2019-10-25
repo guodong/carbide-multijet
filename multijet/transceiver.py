@@ -108,10 +108,11 @@ class ReassembleTransceiver(LayeredTransceiver):
             self._recv_callback(msg, source)
 
     def dump(self):
+        s = "ReassembleTransceiver("
         for source, d in self._reassemble_buf.items():
             if len(d)>0:
-                return "error len(buf)=%d source=%s" % (len(d), str(source))
-        return None
+                return "error len(buf)=%d source=%s," % (len(d), str(source))
+        return s + self._out_trans.dump() + ")"
 
 
 class DeMuxTransceiver(object):
@@ -124,6 +125,8 @@ class DeMuxTransceiver(object):
     def send(self, obj, target, source): raise NotImplementedError
 
     def on_recv(self, obj, source): raise NotImplementedError
+
+    def dump(self): raise NotImplementedError
 
 
 class DeMuxAdapter(Transceiver):
@@ -139,6 +142,9 @@ class DeMuxAdapter(Transceiver):
     def on_recv(self, obj, source):
         if self._recv_callback is not None:
             self._recv_callback(obj, source)
+
+    def dump(self):
+        return self._out_demux.dump()
 
 
 class BinaryLayeredDeMuxTransceiver(DeMuxTransceiver):
@@ -159,6 +165,9 @@ class BinaryLayeredDeMuxTransceiver(DeMuxTransceiver):
         f = self._recv_callback.get(inst_id)
         if f:
             f(data[self.HEADER_LENGTH:], source)
+
+    def dump(self):
+        return self._out_trans.dump()
 
 
 def build_transceiver(insts, out_trans):

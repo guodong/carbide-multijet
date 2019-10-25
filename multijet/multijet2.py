@@ -71,6 +71,9 @@ class PacketTransceiver(Transceiver):
         self._dp = dp
         self._flood_ports = flood_ports
 
+        self.send_statistics = [0, 0, 0, 0, 0, 0]
+        self.recv_statistics = [0, 0, 0, 0, 0, 0]
+
     def send(self, data, target):
         ofp = self._dp.ofproto
         parser = self._dp.ofproto_parser
@@ -89,6 +92,10 @@ class PacketTransceiver(Transceiver):
             out = parser.OFPPacketOut(datapath=self._dp, buffer_id=ofp.OFP_NO_BUFFER, in_port=ofp.OFPP_CONTROLLER,
                                       actions=actions, data=data)
             self._dp.send_msg(out)
+
+            self.send_statistics[0] += 1
+            self.send_statistics[1] += len(data)
+
         elif target[0]=='flood_neighbor':
             p = packet.Packet()
             eth_header = ethernet.ethernet()
@@ -103,6 +110,10 @@ class PacketTransceiver(Transceiver):
             out = parser.OFPPacketOut(datapath=self._dp, buffer_id=ofp.OFP_NO_BUFFER, in_port=ofp.OFPP_CONTROLLER,
                                       actions=actions, data=data)
             self._dp.send_msg(out)
+
+            self.send_statistics[2] += 1
+            self.send_statistics[3] += len(data)
+
         elif target[0]=='flood':
             data = struct.pack('8s', self._node_id) + data
             p = packet.Packet()
@@ -118,6 +129,9 @@ class PacketTransceiver(Transceiver):
             out = parser.OFPPacketOut(datapath=self._dp, buffer_id=ofp.OFP_NO_BUFFER, in_port=ofp.OFPP_CONTROLLER,
                                       actions=actions, data=data)
             self._dp.send_msg(out)
+
+            self.send_statistics[4] += 1
+            self.send_statistics[5] += len(data)
         else:
             log('error send packet %s'%(str(target)))
 
@@ -129,19 +143,31 @@ class PacketTransceiver(Transceiver):
         if pkt_ip.proto == self.UNICAST:
             payload = pkt.protocols[-1]
             in_port = ('unicast', in_port)
+
+            self.recv_statistics[0] += 1
+            self.recv_statistics[1] += len(payload)
         elif pkt_ip.proto == self.FLOOD_NEIGHBOR:
             payload = pkt.protocols[-1]
             in_port = ('flood_neighbor', in_port)
+
+            self.recv_statistics[2] += 1
+            self.recv_statistics[3] += len(payload)
         elif pkt_ip.proto == self.FLOOD:
             payload = pkt.protocols[-1]
             source_node_id = struct.unpack_from('8s', payload)[0]
             source_node_id = str(source_node_id).strip('\x00')
             payload = payload[8:]
             in_port = ('flood', source_node_id)
+
+            self.recv_statistics[4] += 1
+            self.recv_statistics[5] += len(payload)
         else:
             return
 
         self._recv_callback(payload, in_port)
+
+    def dump(self):
+        return "send=" + str(self.send_statistics) +" recv=" + str(self.recv_statistics)
 
 
 class Multijet2(app_manager.RyuApp):

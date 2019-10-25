@@ -60,7 +60,7 @@ class PushPullECSMgr(BaseECSMgr):
                 # debug(msg)
             except Exception:
                 log(self.dump_ecs())
-                # log(self.dump_assemble())
+                log("self.transceiver.dump: %s" % str(self.transceiver.dump()))
                 self.check()
                 continue
             if msg['type'] == 'local_update':
