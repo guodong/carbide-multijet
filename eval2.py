@@ -371,12 +371,15 @@ class RocketFuel(Cmd):
                 json.dump(results, f, indent=2)
 
     def _watch_install_and_finish(self, n):
-        _, t1, _ = self._watch_wait_read(n, ('handle one message',))
+        # _, t1, _ = self._watch_wait_read(n, ('handle one message',))
+        t1 = None
         last_t2 = None
         while True:
             words = ('handle one message', '=======dumpecs')
             w, t2, _ = self._watch_wait_read(n, words)
             if w == words[0]:
+                if t1 is None:
+                    t1 = t2
                 last_t2 = t2
             else:
                 break
@@ -459,11 +462,13 @@ class RocketFuel(Cmd):
 
         self.watch_pos = {}
 
-
         results = []
         num = 0
         path = []
         ip = ""
+
+        watched_nodes = list(n for n in self.routers)
+
         for i in range(150):
             # rules_once = {n: {k: output} for n, output in ks.items()}
             if i%3 == 0:
@@ -471,7 +476,7 @@ class RocketFuel(Cmd):
                 ip = '99.0.%d.0/24'% (i//3)
                 rules_once = {n: {ip: output} for n, output in path}
                 eval_type = 'path'
-                watched_nodes = list(n for n,output in path)
+                # watched_nodes = list(n for n,output in path)
             elif i%3 == 1:
                 eval_type = 'delete'
                 rules_once = {path[-1][0]: {ip: None}}
@@ -490,6 +495,8 @@ class RocketFuel(Cmd):
             detail = {}
             for n in watched_nodes:
                 t2, t1, stat = self._watch_install_and_finish(n)
+                if t2 is None:
+                    continue
                 if t2_mx < t2: t2_mx = t2
                 if t1_mn > t1: t1_mn = t1
                 delta_t = t2 - t1
@@ -498,7 +505,8 @@ class RocketFuel(Cmd):
                 detail[n] = {
                     't1': t1,
                     't2': t2,
-                    'delta': delta_t
+                    'delta': delta_t,
+                    'stat': stat
                 }
 
             delta_t = t2_mx - t1_mn
@@ -528,14 +536,16 @@ class RocketFuel(Cmd):
     def do_dump_random_path(self, line):
         paths = []
         try:
-            num = int(line)
+            num, a, b = line.split()
+            num = int(num)
+            start = int(a)
+            end = int(b)
         except:
             print('error argument')
             return
+
         while len(paths) < num:
-            start = len(self.topo.nodes) // 3 + 1
-            end = start * 2
-            select_len = start + len(paths) % (end - start + 1)
+            select_len = random.randint(start, end)
             nodes = list(self.topo.nodes.keys())
             r1 = random.randint(0, len(nodes)-1)
             sn = nodes[r1]
@@ -551,7 +561,7 @@ class RocketFuel(Cmd):
                 ns = nsn[r2]
                 path.append(ns[0])
                 sn = ns[1]
-                print('path', path)
+            print('path', path)
 
             if len(path)>= start:
                 paths.append(path)
