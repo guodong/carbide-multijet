@@ -218,10 +218,16 @@ class RocketFuel(Cmd):
             c.exec_run('zebra -d -f /etc/quagga/zebra.conf --fpm_format protobuf')
             c.exec_run('ospfd -d -f /etc/quagga/ospfd.conf')
 
+    def do_start_fpm_server(self, line):
         for r in self.routers.values():
             print 'start fpm for ' + r.id
             c = self.containers[r.id]
             c.exec_run('python /fpm/main.py &', detach=True)
+
+    def do_kill_ospf_and_server(self, line):
+        os.system('pkill -f -e "^python /fpm/main.py"')
+        os.system('pkill -f -e "^zebra"')
+        os.system('pkill -f -e "^ospfd"')
 
     def do_start_ryu(self, line):
         for r in self.routers.values():
@@ -245,11 +251,12 @@ class RocketFuel(Cmd):
                 os.remove(log_file_path)
 
     def do_kill_ryu(self, line):
-        for r in self.routers.values():
-            print 'kill multijet2 for ' + r.id
-            c = self.containers[r.id]
-            code, output = c.exec_run('pkill ryu')
-            print(output)
+        os.system('pkill -f -e "^ryu-manager /multijet/mu"')
+        # for r in self.routers.values():
+        #     print 'kill multijet2 for ' + r.id
+        #     c = self.containers[r.id]
+        #     code, output = c.exec_run('pkill ryu')
+        #     print(output)
 
     def do_ps(self, line):
         for r in self.routers.values():

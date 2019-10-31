@@ -6,10 +6,16 @@ import netifaces
 import fpm_pb2 as fpm
 import time
 import logging
+import platform
+import json
 
 logger = logging.getLogger(__name__)
 logger.setLevel(level = logging.INFO)
 handler = logging.FileHandler("/tmp/fpmlog")
+if os.path.exists('/common'):
+    handler = logging.FileHandler("/common/fpm-server-%s.log"%str(platform.node()))
+else:
+    handler = logging.StreamHandler()
 handler.setLevel(logging.INFO)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 handler.setFormatter(formatter)
@@ -18,6 +24,19 @@ logger.addHandler(handler)
 ifaces = netifaces.interfaces()
 ifaces.remove('eth0')
 ifaces.remove('lo')
+
+if os.path.exists('/common'):
+    history_file = '/common/fpm-history-%s.json'%str(platform.node())
+else:
+    history_file = '/tmp/fpm-history-%s.json'%str(platform.node())
+
+history_list = []
+
+
+def history_list_append_and_dump(obj):
+    history_list.append(obj)
+    with open(history_file, 'w') as f:
+        json.dump(history_list, f, indent=2)
 
 
 # fpm nexthop interface id to ovs port id, eg: 9 -> 2 means #9 is i0, ofport is e0 id = 1
@@ -44,8 +63,14 @@ def add_flow(dst, output):
         actions = 'output:' + output
 
     cmd = 'ovs-ofctl add-flow s table=100,ip,nw_dst=' + dst + ',actions=' + actions
-    logger.info(cmd)
-    os.system(cmd)
+    logger.info('add-flow dst=%s output=%s' % (str(dst), str(output)))
+    history_list_append_and_dump({
+        "type": "add-flow",
+        "time": time.time(),
+        "dst": str(dst),
+        "output": str(output)
+    })
+    # os.system(cmd)
 
 
 def bytes2Ip(bts):
