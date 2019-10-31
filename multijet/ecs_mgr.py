@@ -39,9 +39,9 @@ class BaseECSMgr(object):
 
     def dump_ecs(self):
         s = "=======dumpecs===%s==============\n"%self.node_id
-        for ec in self._ecs.values():
-            s += "%s <----> %s\n"%(str(ec.space), str(ec.route))
-        s += "============%s==============\n" % self.node_id
+        # for ec in self._ecs.values():
+        #     s += "%s <----> %s\n"%(str(ec.space), str(ec.route))
+        # s += "============%s==============\n" % self.node_id
         return s
 
 
@@ -50,10 +50,12 @@ class PushPullECSMgr(BaseECSMgr):
         super(PushPullECSMgr, self).__init__(node_id, queue, topo, transceiver)
         self._ecs_request_seq = 0
         self._ecs_requests = {}
+        self._ecs_changed = False
 
     def run(self):
         log('start run')
         while True:
+            self._ecs_changed = False
             try:
                 msg = self.queue.get(timeout=5)
                 log('handle one message')
@@ -74,11 +76,14 @@ class PushPullECSMgr(BaseECSMgr):
             else:
                 log('error queue message type')
             # debug(self.dump_ecs())
-            log('handle one message')
+            log('handle one message, %s'%('ecs_changed' if self._ecs_changed else 'no_ecs_change'))
 
     def check(self):
         if len(self._ecs_requests)>0:
             log('error len(self._ecs_requests)=%d'%(len(self._ecs_requests)))
+        # for ec in self._ecs.values():
+        #     if len(ec.route[-1])==2:
+        #         log('error unreachable route %s'%(str(ec)))
 
     def on_recv(self, obj, source):
         # source  ('unicast', recv_port)   ('flood', )
@@ -192,14 +197,29 @@ class PushPullECSMgr(BaseECSMgr):
     def _update_local(self, route, space):
         if route[0][1] is None:
             for r, ec in list(self._ecs.items()):
+                if len(space & ec.space) > 0:    # NOTE:
+                    self._ecs_changed = True
+
                 ec.space -= space
                 if len(ec.space) == 0:
                     self._ecs.pop(r)
         else:
-            self._ecs.setdefault(route, EC(route, IPSet()))
-            self._ecs[route].space |= space
+            if route not in self._ecs:  # NOTE:
+                self._ecs[route] = EC(route, space)
+                self._ecs_changed = True
+            else:
+                ec = self._ecs[route]
+                if not space.issubset(ec.space):
+                    ec.space.update(space)
+                    self._ecs_changed = True
+
+            # self._ecs.setdefault(route, EC(route, IPSet()))
+            # self._ecs[route].space |= space
             for r, ec in list(self._ecs.items()):
                 if r != route:
+                    if len(space & ec.space) > 0:  # NOTE:
+                        self._ecs_changed = True
+
                     ec.space -= space
                     if len(ec.space) == 0:
                         self._ecs.pop(r)
@@ -211,6 +231,9 @@ class PushPullECSMgr(BaseECSMgr):
             if r12 is not None:
                 changed_space = ec.space & space
                 if len(changed_space) > 0:
+
+                    self._ecs_changed = True  # NOTE:
+
                     ec.space -= changed_space
                     if len(ec.space) == 0:
                         self._ecs.pop(r)
@@ -249,11 +272,14 @@ class FloodECSMgr(BaseECSMgr):
         self._tmp_save_flood_ecs = {}
         self._last_updated_unknown_next_hosts = set()
         self._fix_last_updated_count = 0
+        self._ecs_changed = False
 
     def run(self):
         log('start run')
         msg = None
         while True:
+            self._ecs_changed = False
+
             if msg is None:
                 try:
                     msg = self.queue.get(timeout=5)
@@ -280,7 +306,7 @@ class FloodECSMgr(BaseECSMgr):
             except Exception:
                 self._fix_last_updated_unknown_next_hosts()
                 msg = None
-            log('handle one message')
+            log('handle one message, %s'%('ecs_changed' if self._ecs_changed else 'no_ecs_change'))
 
     def _reset_tmp_save_flood_ecs(self):
         self._tmp_save_flood_ecs = {}
@@ -289,9 +315,9 @@ class FloodECSMgr(BaseECSMgr):
     def check(self):
         if len(self._ecs_requests)>0:
             log('error len(self._ecs_requests)=%d' % (len(self._ecs_requests)))
-        for ec in self._ecs.values():
-            if len(ec.route[-1])==2:
-                log('error unreachable route %s'%(str(ec)))
+        # for ec in self._ecs.values():
+        #     if len(ec.route[-1])==2:
+        #         log('error unreachable route %s'%(str(ec)))
         log('self._fix_last_updated_count=%d'%self._fix_last_updated_count)
 
     def on_recv(self, obj, source):
@@ -423,14 +449,29 @@ class FloodECSMgr(BaseECSMgr):
     def _update_local(self, route, space):
         if route[0][1] is None:
             for r, ec in list(self._ecs.items()):
+                if len(space & ec.space) > 0:    # NOTE:
+                    self._ecs_changed = True
+
                 ec.space -= space
                 if len(ec.space) == 0:
                     self._ecs.pop(r)
         else:
-            self._ecs.setdefault(route, EC(route, IPSet()))
-            self._ecs[route].space |= space
+            if route not in self._ecs:  # NOTE:
+                self._ecs[route] = EC(route, space)
+                self._ecs_changed = True
+            else:
+                ec = self._ecs[route]
+                if not space.issubset(ec.space):
+                    ec.space.update(space)
+                    self._ecs_changed = True
+
+            # self._ecs.setdefault(route, EC(route, IPSet()))
+            # self._ecs[route].space |= space
             for r, ec in list(self._ecs.items()):
                 if r!= route:
+                    if len(space & ec.space) > 0:  # NOTE:
+                        self._ecs_changed = True
+
                     ec.space -= space
                     if len(ec.space) == 0:
                         self._ecs.pop(r)
@@ -446,7 +487,10 @@ class FloodECSMgr(BaseECSMgr):
                 # if r12[-1][1] is None:
                 #     log('route=%s space=%s  r=%s r12=%s'%(str(route), str(space), str(r), str(r12)))
                 changed_space = ec.space & space
-                if len(changed_space)>0:
+                if len(changed_space) > 0:
+
+                    self._ecs_changed = True # NOTE:
+
                     ec.space -= changed_space
                     if len(ec.space)==0:
                         self._ecs.pop(r)

@@ -342,7 +342,7 @@ class RocketFuel(Cmd):
             t2_mx = 0
             detail = {}
             for n in ks.keys():
-                t2, t1, stat = self._watch_install_and_finish(n)
+                t1, t2, last_changed_t2, stat = self._watch_install_and_finish(n)
                 if t2_mx<t2: t2_mx = t2
                 if t1_mn>t1: t1_mn = t1
                 delta_t = t2 - t1
@@ -374,18 +374,21 @@ class RocketFuel(Cmd):
         # _, t1, _ = self._watch_wait_read(n, ('handle one message',))
         t1 = None
         last_t2 = None
+        last_changed_t2 = None
         while True:
             words = ('handle one message', '=======dumpecs')
-            w, t2, _ = self._watch_wait_read(n, words)
+            w, t2, line = self._watch_wait_read(n, words)
             if w == words[0]:
                 if t1 is None:
                     t1 = t2
                 last_t2 = t2
+                if 'ecs_changed' in line:
+                    last_changed_t2 = t2
             else:
                 break
         _, _, line = self._watch_wait_read(n, ('self.transceiver.dump',))
 
-        return last_t2,  t1, self._parse_statistics(line)
+        return t1, last_t2, last_changed_t2 , self._parse_statistics(line)
 
     def _parse_statistics(self, line):
         send, recv = re.findall('=\[(\d+), (\d+), (\d+), (\d+), (\d+), (\d+)\]', line)
@@ -450,6 +453,20 @@ class RocketFuel(Cmd):
         self.do_eval2('pp-node.log')
         self.do_kill_ryu('')
 
+    def do_repeat_eval2_2times(self, line):
+        for i in range(3,20,2):
+            self.do_dump_random_path("%d %d %d"%(10, i, i))
+            os.system('rm -f configs/common/pp')
+            self.do_start_ryu2('')
+            time.sleep(20)
+            self.do_eval2('flood-node-10-31-%d.log'%(i))
+            self.do_kill_ryu('')
+            os.system('touch configs/common/pp')
+            self.do_start_ryu2('')
+            time.sleep(20)
+            self.do_eval2('pp-node-10-31-%d.log'%(i))
+            self.do_kill_ryu('')
+
     def do_eval2(self, line):
         if line is None or line == "":
             print('please give a log file name')
@@ -469,10 +486,11 @@ class RocketFuel(Cmd):
 
         watched_nodes = list(n for n in self.routers)
 
-        for i in range(150):
+        config_path_length = self._get_config_path_length()
+        for i in range(config_path_length*3):
             # rules_once = {n: {k: output} for n, output in ks.items()}
             if i%3 == 0:
-                path = self._random_select_path(i//3)  # [(node, output)]
+                path = self._read_config_path(i//3)  # [(node, output)]
                 ip = '99.0.%d.0/24'% (i//3)
                 rules_once = {n: {ip: output} for n, output in path}
                 eval_type = 'path'
@@ -492,19 +510,25 @@ class RocketFuel(Cmd):
             time.sleep(5)
             t1_mn = float('inf')
             t2_mx = 0
+            last_changed_t2_mx = None
             detail = {}
             for n in watched_nodes:
-                t2, t1, stat = self._watch_install_and_finish(n)
+                t1, t2, last_changed_t2, stat = self._watch_install_and_finish(n)
                 if t2 is None:
                     continue
                 if t2_mx < t2: t2_mx = t2
                 if t1_mn > t1: t1_mn = t1
                 delta_t = t2 - t1
-                print('t1', t1, 't2', t2)
+
+                if last_changed_t2 is not None:
+                    if last_changed_t2_mx is None or last_changed_t2>last_changed_t2_mx:
+                        last_changed_t2_mx = last_changed_t2
+                # print('t1', t1, 't2', t2)
                 print('node %s update time %f' % (n, delta_t))
                 detail[n] = {
                     't1': t1,
                     't2': t2,
+                    'last_changed_t2': last_changed_t2,
                     'delta': delta_t,
                     'stat': stat
                 }
@@ -512,12 +536,20 @@ class RocketFuel(Cmd):
             delta_t = t2_mx - t1_mn
             print('converge time %f' % delta_t)
 
+            if last_changed_t2_mx is None:
+                last_changed_delta_t = None
+            else:
+                last_changed_delta_t = last_changed_t2_mx - t1_mn
+
+            print('last_changed_delta_t', last_changed_delta_t)
+
             results.append({
                 'rules': rules_once,
                 'num': num,
                 't2': t2_mx,
                 't1': t1_mn,
                 'delta': delta_t,
+                'last_changed_delta_t': last_changed_delta_t,
                 'detail': detail,
                 'type': eval_type,
                 'path': path,
@@ -528,10 +560,15 @@ class RocketFuel(Cmd):
             with open(result_file_name, 'w') as f:
                 json.dump(results, f, indent=2)
 
-    def _random_select_path(self, i):
+    def _read_config_path(self, i):
         with open('configs/common/random_path.json') as f:
             data = json.load(f)
         return [(str(n), int(output)) for n,output in data[i]]
+
+    def _get_config_path_length(self):
+        with open('configs/common/random_path.json') as f:
+            data = json.load(f)
+        return len(data)
 
     def do_dump_random_path(self, line):
         paths = []

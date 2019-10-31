@@ -145,13 +145,13 @@ class PacketTransceiver(Transceiver):
             in_port = ('unicast', in_port)
 
             self.recv_statistics[0] += 1
-            self.recv_statistics[1] += len(payload)
+            self.recv_statistics[1] += len(pkt.data)
         elif pkt_ip.proto == self.FLOOD_NEIGHBOR:
             payload = pkt.protocols[-1]
             in_port = ('flood_neighbor', in_port)
 
             self.recv_statistics[2] += 1
-            self.recv_statistics[3] += len(payload)
+            self.recv_statistics[3] += len(pkt.data)
         elif pkt_ip.proto == self.FLOOD:
             payload = pkt.protocols[-1]
             source_node_id = struct.unpack_from('8s', payload)[0]
@@ -160,7 +160,7 @@ class PacketTransceiver(Transceiver):
             in_port = ('flood', source_node_id)
 
             self.recv_statistics[4] += 1
-            self.recv_statistics[5] += len(payload)
+            self.recv_statistics[5] += len(pkt.data)
         else:
             return
 

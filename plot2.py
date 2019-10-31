@@ -14,12 +14,14 @@ def load_data(path):
     send_stats = []
     recv_stats = []
     detail_delta_list = []
+    changed_delta = []
 
     send_statistics_map = [defaultdict(lambda: 0) for i in range(6)]
     recv_statistics_map = [defaultdict(lambda: 0) for i in range(6)]
 
     for item in data:
         delta.append(float(item['delta']))
+        changed_delta.append(float(item['last_changed_delta_t']))
         num.append(int(item['num']))
 
         send_delta_stats = [0] * 6
@@ -45,7 +47,14 @@ def load_data(path):
         recv_stats.append(recv_delta_stats)
         detail_delta_list.append(detail_delta)
 
-    return num, delta, send_stats, recv_stats, detail_delta_list
+    # print(send_stats)
+    # print(recv_stats)
+    # for i in range(len(send_stats)):
+    #     print(float(recv_stats[i][4])/send_stats[i][4])
+    #     print(float(recv_stats[i][5]) / send_stats[i][5])
+    return num, delta, changed_delta, send_stats, recv_stats, detail_delta_list
+
+DATADIR = 'data.log/'
 
 OUTPUTDIR = 'output.log/'
 
@@ -56,7 +65,7 @@ GLOBAL_SHOW = False
 
 def plot1(xx1, yy1, xx2, yy2, xl='Update sequence number',
           yl='Time (s)',
-          title = 'Convergence time of network',
+          title = 'time delta1 of network',
           savefig = None):
     plt.clf()
     plt.grid()
@@ -71,7 +80,7 @@ def plot1(xx1, yy1, xx2, yy2, xl='Update sequence number',
         plt.title(title)
 
     if GLOBAL_SAVEFIG and savefig:
-        plt.savefig(OUTPUTDIR + savefig)
+        plt.savefig(OUTPUTDIR + savefig, bbox_inches='tight')
 
     if GLOBAL_SHOW:
         plt.show()
@@ -79,7 +88,7 @@ def plot1(xx1, yy1, xx2, yy2, xl='Update sequence number',
 
 def plot_detail_delta(detail_delta_list1, detail_delta_list2, xl='Update sequence number',
           yl='Time (s)',
-          title = 'Convergence time of each node',
+          title = 'time delta1 of each node',
           savefig = None):
     assert len(detail_delta_list1)==len(detail_delta_list2)
 
@@ -112,7 +121,7 @@ def plot_detail_delta(detail_delta_list1, detail_delta_list2, xl='Update sequenc
         plt.title(title)
 
     if GLOBAL_SAVEFIG and savefig:
-        plt.savefig(OUTPUTDIR + savefig)
+        plt.savefig(OUTPUTDIR + savefig, bbox_inches='tight')
 
     plt.grid()
 
@@ -120,60 +129,48 @@ def plot_detail_delta(detail_delta_list1, detail_delta_list2, xl='Update sequenc
         plt.show()
 
 
-def singlepath(suffix='5-8'):
-    num1, delta1, send_stat1, recv_stat1, detail_delta_list1 = load_data('/home/yutao/tmp/flood-node-%s.log' % suffix)
-    num2, delta2, send_stat2, recv_stat2, detail_delta_list2 = load_data('/home/yutao/tmp/pp-node-%s.log' % suffix)
+def plot_flood_add_pp(data1, data2, prefix):
+    num1, delta1, changed_delta1, send_stat1, recv_stat1, detail_delta_list1 = data1
+    num2, delta2, changed_delta2, send_stat2, recv_stat2, detail_delta_list2 = data2
 
-    prefix = 'single-path-%s-' % suffix
-    type = ('install-path', 'delete', 'add')
+    plot1(num1, delta1, num2, delta2, savefig=prefix + '-time.png')
 
-    for i in range(3):
-        _prefix = prefix + type[i]
-        # xx1 = num1[i::3]
-        xx1 = xx2 = list(range(1, 51))
-        yy1 = delta1[i::3]
-        # xx2 = num2[i::3]
-        yy2 = delta2[i::3]
-        plot1(xx1, yy1, xx2, yy2, savefig = '%s-time.png'%_prefix)
+    plot1(num1, changed_delta1, num2, changed_delta2, title='time delta2', savefig=prefix + '-real-time.png')
 
-        _send_stat1 = send_stat1[i::3]
-        _send_stat2 = send_stat2[i::3]
-        _recv_stat1 = recv_stat1[i::3]
-        _recv_stat2 = recv_stat2[i::3]
-        base = 1024*1024.0
-        send_pkts1 = [(a[1]+a[3]+a[5]) / base for a in _send_stat1]
-        send_pkts2 = [(a[1]+a[3]+a[5]) / base for a in _send_stat2]
-        plot1(xx1, send_pkts1, xx2, send_pkts2, yl='Send message size (MB)', title='Send message size',
-              savefig='%s-send-msg.png'%_prefix)
+    base = 1024 * 1024.0
+    send_pkts1 = [(i[1] + i[3] + i[5]) / base for i in send_stat1]
+    send_pkts2 = [(i[1] + i[3] + i[5]) / base for i in send_stat2]
+    plot1(num1, send_pkts1, num2, send_pkts2, yl='Send message size (MB)', title='Send message size',
+          savefig=prefix + '-send-msg-size.png')
 
-        recv_pkts1 = [(a[1]+a[3]+a[5]) / base for a in _recv_stat1]
-        recv_pkts2 = [(a[1]+a[3]+a[5]) / base for a in _recv_stat2]
-        plot1(xx1, recv_pkts1, xx2, recv_pkts2, yl = 'Received message size (MB)', title='Received message size',
-              savefig='%s-recv-msg.png'%_prefix)
-
-        _detail_delta_list1 = detail_delta_list1[i:(30+i):3]
-        _detail_delta_list2 = detail_delta_list2[i:(30+i):3]
-        plot_detail_delta(_detail_delta_list1, _detail_delta_list2, savefig='%s-node-time.png'%_prefix)
-
-
-def ospf():
-    num1, delta1, send_stat1, recv_stat1, detail_delta_list1 = load_data('/home/yutao/tmp/flood-ospf1.log')
-    num2, delta2, send_stat2, recv_stat2, detail_delta_list2 = load_data('/home/yutao/tmp/pp-ospf1.log')
-
-    plot1(num1, delta1, num2, delta2, savefig='ospf-path-time.png')
-
-    base = 1024*1024.0
-    send_pkts1 = [(i[1]+i[3]+i[5]) / base for i in send_stat1]
-    send_pkts2 = [(i[1]+i[3]+i[5]) / base for i in send_stat2]
-    plot1(num1, send_pkts1, num2, send_pkts2, yl='Send message size (MB)', title='Send message size', savefig='ospf-path-send-msg.png')
-
-    recv_pkts1 = [(i[1]+i[3]+i[5]) / base for i in recv_stat1]
-    recv_pkts2 = [(i[1]+i[3]+i[5]) / base for i in recv_stat2]
-    plot1(num1, recv_pkts1, num2, recv_pkts2, yl = 'Received message size (MB)', title='Received message size', savefig='ospf-path-recv-msg.png')
+    recv_pkts1 = [(i[1] + i[3] + i[5]) / base for i in recv_stat1]
+    recv_pkts2 = [(i[1] + i[3] + i[5]) / base for i in recv_stat2]
+    plot1(num1, recv_pkts1, num2, recv_pkts2, yl='Received message size (MB)', title='Received message size',
+          savefig=prefix + '-recv-msg-size.png')
 
     _detail_delta_list1 = detail_delta_list1[0:10]
     _detail_delta_list2 = detail_delta_list2[0:10]
-    plot_detail_delta(_detail_delta_list1, _detail_delta_list2, savefig= 'ospf-path-node-time.png')
+    plot_detail_delta(_detail_delta_list1, _detail_delta_list2,
+                      savefig=prefix + '-node-time.png')
+
+
+def ospf(flood_file='flood-ospf1.log', pp_file='pp-ospf1.log', prefix='ospf1-update-one-subnet'):
+    data1 = load_data(DATADIR+flood_file)
+    data2 = load_data(DATADIR+pp_file)
+    plot_flood_add_pp(data1, data2, prefix=prefix)
+
+
+def singlepath(suffix='5-8'):
+    data1 = load_data(DATADIR + 'flood-node-%s.log' % suffix)
+    data2 = load_data(DATADIR + 'pp-node-%s.log' % suffix)
+    prefix = 'single-path-%s-' % suffix
+    type = ('install-path', 'delete', 'add')
+    for i in range(3):
+        _prefix = prefix + type[i]
+
+        _data1 = [item[i::3] for item in data1]
+        _data2 = [item[i::3] for item in data2]
+        plot_flood_add_pp(_data1, _data2, prefix=_prefix)
 
 
 if __name__=='__main__':
@@ -181,8 +178,9 @@ if __name__=='__main__':
     # plt.boxplot([[1, 2, 3, 6], [1, 3, 3]],positions=[1.5,3.5], widths=0.5, patch_artist=True)
     # plt.xlim(0,50)
     # plt.show()
-    singlepath('5-8')
-    singlepath('15-18')
-    singlepath('25-28')
-    ospf()
+    # singlepath('5-8')
+    # singlepath('15-18')
+    # singlepath('25-28')
     # ospf()
+    # ospf()
+    singlepath('4sw-3hop')
