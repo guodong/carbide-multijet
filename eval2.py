@@ -229,6 +229,73 @@ class RocketFuel(Cmd):
         os.system('pkill -f -e "^zebra"')
         os.system('pkill -f -e "^ospfd"')
 
+    def do_start_ospf_and_server(self, line):
+        os.system("rm -f configs/common/fpm-history-*.json")
+        os.system("rm -f configs/common/fpm-server-*.log")
+        self.do_start_fpm_server(None)
+        self.do_start_ospf(None)
+
+    def do_start_ospf_and_server_async(self, line):
+        os.system("rm -f configs/common/fpm-history-*.json")
+        os.system("rm -f configs/common/fpm-server-*.log")
+        self.do_start_fpm_server(None)
+        # self.do_start_ospf(None)
+        urls = []
+        for c in self.containers:
+            ip = str(client.containers.get(c).attrs['NetworkSettings']['Networks']['bridge']['IPAddress'])
+            urls.append('http://' + ip + ':8080/startospf')
+        rs = (grequests.get(u) for u in urls)
+        resps = grequests.map(rs)
+        print(resps)
+
+
+    def do_link_down_test(self, line):
+        links_list = list(self.topo.links.items())
+        for index in range(1):
+            ri = random.randint(0, len(links_list)-1)
+            pair = links_list[ri]
+            self._link_down(pair)
+            for i in range(1,10):
+                print(i)
+                time.sleep(1)
+            self._link_up(pair)
+
+    def do_link(self, line):
+        args = line.split()
+        if len(args) < 3:
+            print("error args")
+            return
+        op, n1, n2 = args[0], args[1], args[2]
+        if n1 not in self.topo.nodes or n2 not in self.topo.nodes:
+            print("error args")
+            return
+        for start, end in self.topo.links.items():
+            if start[0] == n1 and end[0] == n2:
+                if op == 'down':
+                    self._link_down((start, end))
+                elif op == 'up':
+                    self._link_up((start, end))
+                break
+        else:
+            print("not find link")
+
+    def _link_down(self, pair):  # ((n1, p1), (n2, p2))
+        for n, p in pair:
+            ename = self.topo.nodes[n][p]['name']
+            iname = 'i' + ename[1:]
+            pid = client.containers.get(n).attrs['State']['Pid']
+            utils.nsenter_run(pid, "ifconfig %s down" % iname)
+            print('down', n, iname)
+
+    def _link_up(self, pair):
+        for n, p in pair:
+            ename = self.topo.nodes[n][p]['name']
+            iname = 'i' + ename[1:]
+            pid = client.containers.get(n).attrs['State']['Pid']
+            utils.nsenter_run(pid, "ifconfig %s up" % iname)
+            print('up', n, iname)
+
+
     def do_start_ryu(self, line):
         for r in self.routers.values():
             print 'start multijet for ' + r.id
@@ -251,7 +318,7 @@ class RocketFuel(Cmd):
                 os.remove(log_file_path)
 
     def do_kill_ryu(self, line):
-        os.system('pkill -f -e "^ryu-manager /multijet/mu"')
+        os.system('pkill -f -e "^/usr/bin/python /usr/local/bin/ryu-manager"')
         # for r in self.routers.values():
         #     print 'kill multijet2 for ' + r.id
         #     c = self.containers[r.id]

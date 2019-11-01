@@ -58,7 +58,13 @@ class MultijetServer(ControllerBase):
         data = req.json
         print(data)
         self._app.on_trigger('install', data = data)
+        return 'ok'
 
+    @route('test', '/startospf', methods=['GET'])
+    def start_ospf_process(self, req, **kwargs):
+        os.system('zebra -d -f /etc/quagga/zebra.conf --fpm_format protobuf')
+        os.system('ospfd -d -f /etc/quagga/ospfd.conf')
+        return 'ok'
 
 class PacketTransceiver(Transceiver):
     UNICAST = 144

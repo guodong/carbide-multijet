@@ -9,6 +9,9 @@ from .utils import log, debug
 
 
 class EC:
+    """  Equivalence Class Item
+    currently,  only consider about dst IP prefix, use IPSet class to maintain space
+    """
     def __init__(self, route, space):  # type: (tuple, IPSet) -> None
         self.route = route  # (("sw1",2), ("sw1", 3))
         self.space = space  # IPSet("1.0.1.0/24")
@@ -25,6 +28,8 @@ class EC:
 
 
 class BaseECSMgr(object):
+    """ECS Manager base class
+    """
     def __init__(self, node_id, queue, topo, transceiver):
         self._ecs = {}  # type: {tuple: EC}
         self.node_id = node_id  # type: str
@@ -39,13 +44,15 @@ class BaseECSMgr(object):
 
     def dump_ecs(self):
         s = "=======dumpecs===%s==============\n"%self.node_id
-        # for ec in self._ecs.values():
-        #     s += "%s <----> %s\n"%(str(ec.space), str(ec.route))
-        # s += "============%s==============\n" % self.node_id
+        for ec in self._ecs.values():
+            s += "%s <----> %s\n"%(str(ec.space), str(ec.route))
+        s += "============%s==============\n" % self.node_id
         return s
 
 
 class PushPullECSMgr(BaseECSMgr):
+    """ECS Mananger
+    """
     def __init__(self, node_id, queue, topo, transceiver):
         super(PushPullECSMgr, self).__init__(node_id, queue, topo, transceiver)
         self._ecs_request_seq = 0
@@ -289,8 +296,10 @@ class FloodECSMgr(BaseECSMgr):
                     log(self.dump_ecs())
                     log("self.transceiver.dump: %s" % str(self.transceiver.dump()))
                     self.check()
-                    self._reset_tmp_save_flood_ecs()
+
+                    self._reset_tmp_save_flood_ecs()  # clear _tmp_save_flood_ecs
                     continue
+
             if msg['type'] == 'local_update':
                 self.update_local_rules(msg['rules'])
             elif msg['type'] == 'unicast':
@@ -302,9 +311,9 @@ class FloodECSMgr(BaseECSMgr):
             else:
                 log('error queue message type')
             try:
-                msg = self.queue.get(timeout=0.00001)
+                msg = self.queue.get(timeout=0.00001) # using timeout but not empty-method is to switch to packet receiving thread first
             except Exception:
-                self._fix_last_updated_unknown_next_hosts()
+                self._fix_last_updated_unknown_next_hosts()  # fix ECS with self._tmp_save_flood_ecs, putting it here is to make queue empty first
                 msg = None
             log('handle one message, %s'%('ecs_changed' if self._ecs_changed else 'no_ecs_change'))
 
@@ -426,7 +435,7 @@ class FloodECSMgr(BaseECSMgr):
                     for t, obj in list(sn_save.items()):
                         if now-t > 500:
                             sn_save.pop(t)
-                            log("sn_save pop")
+                            log("unexpected timeout")
                         else:
                             ec_list = obj['ecs']
                             for recv_ec in ec_list:
@@ -543,6 +552,9 @@ class FloodECSMgr(BaseECSMgr):
                 flood_ecs.append(EC(tmp_route, dst_match))
             else:
                 port_network = self.topo.get_network(self.node_id, fwd_port)
+                # if(port_network is None):
+                print(self.node_id, fwd_port)
+                print('port_network',port_network)
                 port_network = IPSet(IPNetwork(port_network).cidr)
                 host_route_space = dst_match & port_network
                 if len(host_route_space) > 0:
