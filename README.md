@@ -6,12 +6,18 @@
 
     sudo python eval2.py xxxx.cch
 
+> must run at this directory; if `configs/common/pp` file exists, system use PushPull algorithm, else use Flood algorithm
+
 2. some evaluation commands
 
 ```
-
+start_ryu2     # start main multijet process
+kill_ryu       # kill multijet process
+eval           # evaluation: install all ospf rules
+eval2          # evaluation: install a path, delete rule, add rule
+start_ospf_and_server
+kill_ospf_and_server
 ```
-
 
 
 ## Project structure
