@@ -60,7 +60,7 @@ def load_data(path):
     return num, delta, changed_delta, send_stats, recv_stats, detail_delta_list
 
 
-DATADIR = 'data1.log/'
+DATADIR = 'data2.log/'
 
 OUTPUTDIR = 'output.log/'
 
@@ -254,21 +254,21 @@ def plot_flood_and_pp_average():
     d1 = [[], [], []]
     d2 = [[], [], []]
 
-    for i in range(3, 20, 2):
+    for i in range(3, 18, 1):
         # num, delta, changed_delta, send_stats, recv_stats, detail_delta_list
-        data1 = load_data(DATADIR + 'flood-node-10-31-%d.log' % i)
-        data2 = load_data(DATADIR + 'pp-node-10-31-%d.log' % i)
+        data1 = load_data(DATADIR + 'flood-node-11-01-%d.log' % i)
+        data2 = load_data(DATADIR + 'pp-node-11-01-%d.log' % i)
         for i in range(3):
             _data1 = [item[i::3] for item in data1]
             _data2 = [item[i::3] for item in data2]
             d1[i].append(_data1)
             d2[i].append(_data2)
 
-    xticks = [i for i in range(3, 20, 2)]
+    xticks = [i for i in range(3, 18, 1)]
     prefix = ('install', 'delete', 'add')
     title_types_l = ('install path', 'delete last hop', 'add last hop')
     for i in range(3):
-        subfunc(d1[i], d2[i], prefix='result-' + prefix[i], xticks=xticks, title_types=title_types_l[i])
+        subfunc(d1[i], d2[i], prefix='result-11-01-' + prefix[i], xticks=xticks, title_types=title_types_l[i])
 
 
 if __name__ == '__main__':

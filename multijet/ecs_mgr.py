@@ -289,7 +289,7 @@ class FloodECSMgr(BaseECSMgr):
 
             if msg is None:
                 try:
-                    msg = self.queue.get(timeout=5)
+                    msg = self.queue.get(timeout=5)  # timeout above 1 seconds
                     log('handle one message')
                     # debug(msg)
                 except Exception:

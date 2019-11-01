@@ -212,6 +212,7 @@ class RocketFuel(Cmd):
         return ""
 
     def do_start_ospf(self, line):
+        """ start ospf process"""
         for r in self.routers.values():
             print 'start ospf for ' + r.id
             c = self.containers[r.id]
@@ -219,23 +220,27 @@ class RocketFuel(Cmd):
             c.exec_run('ospfd -d -f /etc/quagga/ospfd.conf')
 
     def do_start_fpm_server(self, line):
+        """ start fpm server process"""
         for r in self.routers.values():
             print 'start fpm for ' + r.id
             c = self.containers[r.id]
             c.exec_run('python /fpm/main.py &', detach=True)
 
     def do_kill_ospf_and_server(self, line):
+        """ kill ospf and fpm server process"""
         os.system('pkill -f -e "^python /fpm/main.py"')
         os.system('pkill -f -e "^zebra"')
         os.system('pkill -f -e "^ospfd"')
 
     def do_start_ospf_and_server(self, line):
+        """ start ospf and fpm server prcocess"""
         os.system("rm -f configs/common/fpm-history-*.json")
         os.system("rm -f configs/common/fpm-server-*.log")
         self.do_start_fpm_server(None)
         self.do_start_ospf(None)
 
     def do_start_ospf_and_server_async(self, line):
+        """ start fpm server and start ospf asynchronously"""
         os.system("rm -f configs/common/fpm-history-*.json")
         os.system("rm -f configs/common/fpm-server-*.log")
         self.do_start_fpm_server(None)
@@ -250,6 +255,7 @@ class RocketFuel(Cmd):
 
 
     def do_link_down_test(self, line):
+        """link down test"""
         links_list = list(self.topo.links.items())
         for index in range(1):
             ri = random.randint(0, len(links_list)-1)
@@ -259,8 +265,12 @@ class RocketFuel(Cmd):
                 print(i)
                 time.sleep(1)
             self._link_up(pair)
+            for i in range(1,10):
+                print(i)
+                time.sleep(1)
 
     def do_link(self, line):
+        """link down/up  host1 host2"""
         args = line.split()
         if len(args) < 3:
             print("error args")
@@ -297,12 +307,14 @@ class RocketFuel(Cmd):
 
 
     def do_start_ryu(self, line):
+        """deprecated"""
         for r in self.routers.values():
             print 'start multijet for ' + r.id
             c = self.containers[r.id]
             c.exec_run('ryu-manager /multijet/multijet.py', detach=True)
 
     def do_start_ryu2(self, line):
+        """start multijet main process"""
         self.do_remove_log(None)
 
         for r in self.routers.values():
@@ -312,12 +324,14 @@ class RocketFuel(Cmd):
             print(output)
 
     def do_remove_log(self, line):
+        """remove multijet log file"""
         for n in self.routers:
             log_file_path = 'configs/%s/multijet2.log' % n
             if os.path.exists(log_file_path):
                 os.remove(log_file_path)
 
     def do_kill_ryu(self, line):
+        """kill all ryu process"""
         os.system('pkill -f -e "^/usr/bin/python /usr/local/bin/ryu-manager"')
         # for r in self.routers.values():
         #     print 'kill multijet2 for ' + r.id
@@ -369,6 +383,7 @@ class RocketFuel(Cmd):
         print('test ready done!')
 
     def do_eval_2times(self, line):
+        """SDN install ospf rules"""
         os.system('rm -f configs/common/pp')
         self.do_start_ryu2('')
         time.sleep(20)
@@ -516,6 +531,7 @@ class RocketFuel(Cmd):
                 self.watch_pos[n] = f.tell()
 
     def do_eval2_2times(self, line):
+        """SDN install path, delete rule, add rule evaluation"""
         os.system('rm -f configs/common/pp')
         self.do_start_ryu2('')
         time.sleep(20)
@@ -528,6 +544,7 @@ class RocketFuel(Cmd):
         self.do_kill_ryu('')
 
     def do_repeat_eval2_2times(self, line):
+        """Batch evaluation"""
         for i in range(3,20,2):
             self.do_dump_random_path("%d %d %d"%(10, i, i))
             os.system('rm -f configs/common/pp')
@@ -645,6 +662,7 @@ class RocketFuel(Cmd):
         return len(data)
 
     def do_dump_random_path(self, line):
+        """random generate test path and write configuration file"""
         paths = []
         try:
             num, a, b = line.split()
@@ -681,10 +699,12 @@ class RocketFuel(Cmd):
             json.dump(paths, f, indent=2)
 
     def do_exit(self, line):
+        """exit all container"""
         print('shell exit')
         return True
 
     def do_just_exit(self, line):
+        """just exit this shell, but keep container running"""
         print('just exit')
         exit(0)
 
