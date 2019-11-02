@@ -256,18 +256,42 @@ class RocketFuel(Cmd):
 
     def do_link_down_test(self, line):
         """link down test"""
-        links_list = list(self.topo.links.items())
-        for index in range(1):
+        links_list = list(sorted(self.topo.links.items()))
+        random.seed(0)
+        for index in range(20):
             ri = random.randint(0, len(links_list)-1)
             pair = links_list[ri]
             self._link_down(pair)
-            for i in range(1,10):
+            for i in range(20):
                 print(i)
                 time.sleep(1)
             self._link_up(pair)
-            for i in range(1,10):
+            for i in range(20):
                 print(i)
                 time.sleep(1)
+
+    def do_eval3(self, line):
+        """eval3"""
+        os.system('rm -f configs/common/pp')
+        self.do_start_ryu2('')
+        time.sleep(20)
+        self.do_start_ospf_and_server_async(None)
+        time.sleep(200)
+        self.do_link_down_test(None)
+        time.sleep(20)
+        self.do_kill_ryu('')
+        self.do_kill_ospf_and_server(None)
+
+        os.system('touch configs/common/pp')
+        self.do_start_ryu2('')
+        time.sleep(20)
+        self.do_start_ospf_and_server_async(None)
+        time.sleep(200)
+        self.do_link_down_test(None)
+        time.sleep(20)
+        self.do_kill_ryu('')
+        self.do_kill_ospf_and_server(None)
+
 
     def do_link(self, line):
         """link down/up  host1 host2"""
