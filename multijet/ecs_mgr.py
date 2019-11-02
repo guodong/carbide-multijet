@@ -429,29 +429,42 @@ class FloodECSMgr(BaseECSMgr):
             s = self._last_updated_unknown_next_hosts
             self._last_updated_unknown_next_hosts = set()
             for n in s:
-                sn_save = self._tmp_save_flood_ecs.get(n)
-                if sn_save:
+                sn_save_dict = self._tmp_save_flood_ecs.get(n)
+                if sn_save_dict:
                     now = time.time()
-                    for t, obj in list(sn_save.items()):
+                    for t, ec_list in list(sn_save_dict.items()):
                         if now-t > 500:
-                            sn_save.pop(t)
+                            sn_save_dict.pop(t)
                             log("unexpected timeout")
                         else:
-                            ec_list = obj['ecs']
-                            for recv_ec in ec_list:
-                                self._update_remote(recv_ec.route, recv_ec.space)
+                            ec_list_copy = self._consume_ec_list(ec_list)
+                            if len(ec_list_copy)>0:
+                                sn_save_dict[t] = ec_list_copy
+                            else:
+                                sn_save_dict.pop(t)
+
+    def _consume_ec_list(self, ec_list):
+        ec_list_copy = list(ec_list)
+
+        for recv_ec in ec_list:
+            remained_space = self._update_remote(recv_ec.route, recv_ec.space)
+            if len(remained_space) > 0:
+                recv_ec.space = remained_space
+            else:
+                ec_list_copy.remove(recv_ec)
+
+        return ec_list_copy
 
     def _on_recv_ecs_flood_all(self, obj):  # type: ([EC]) ->None
         ec_list = obj['ecs']
-        source_node = obj['source']
-        sn_save = self._tmp_save_flood_ecs.setdefault(source_node, collections.OrderedDict())
-        now = time.time()
-        # for t in list(sn_save.keys()):
-        #     if now-t>50:
-        #         sn_save.pop(t)
-        sn_save[now] = obj
-        for recv_ec in ec_list:
-            self._update_remote(recv_ec.route, recv_ec.space)
+
+        ec_list_copy = self._consume_ec_list(ec_list)
+
+        if len(ec_list_copy)>0:
+            source_node = obj['source']
+            sn_save = self._tmp_save_flood_ecs.setdefault(source_node, collections.OrderedDict())
+            now = time.time()
+            sn_save[now] = ec_list_copy
 
         # self._fix_last_updated_unknown_next_hosts()
 
@@ -490,6 +503,7 @@ class FloodECSMgr(BaseECSMgr):
                 self._last_updated_unknown_next_hosts.add(n)
 
     def _update_remote(self, route, space):
+
         for r, ec in list(self._ecs.items()):
             r12 = self._route_combine(r, route)
             if r12 is not None and r12 != r:
@@ -500,7 +514,10 @@ class FloodECSMgr(BaseECSMgr):
 
                     self._ecs_changed = True # NOTE:
 
+                    space -= changed_space
+
                     ec.space -= changed_space
+
                     if len(ec.space)==0:
                         self._ecs.pop(r)
                     ec = self._ecs.setdefault(r12, EC.empty(r12))
@@ -509,6 +526,8 @@ class FloodECSMgr(BaseECSMgr):
                     if len(r12[-1]) == 2:
                         n = self.topo.get_nexthop(r12[-1][0], r12[-1][1])
                         self._last_updated_unknown_next_hosts.add(n)
+
+        return space
 
     def _route_combine(self, r1, r2):
         assert len(r1) > 0 and len(r2) > 0 and r1[0][0] != r2[0][0], "format error"
