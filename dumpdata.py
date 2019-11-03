@@ -57,9 +57,12 @@ def dump_data(path='configs'):
             continue
         y += 1
         time_list = data[i]
+        wf1 = open('/tmp/data-%d' % i, 'w')
         for start, end in time_list:
             wf.write("%f %f\n" % (start - g_start, y))
             wf.write("%f %f\n\n" % (end - g_start, y))
+            wf1.write("%f %f\n"%(start-g_start, end-g_start))
+        wf1.close()
 
     wf.close()
 

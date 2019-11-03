@@ -99,6 +99,9 @@ def request_update():
         if dst not in global_flows or global_flows[dst]!=output:
             global_flows[dst] = output
             diff_flows[dst] = output
+    if len(diff_flows)==0:
+        logger.info('empty diff')
+        return
     logger.info("request_update %s" % str(diff_flows))
     url = 'http://localhost:8080/install'
     requests.post(url, json=diff_flows)
