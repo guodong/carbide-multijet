@@ -1,6 +1,7 @@
 import os
 import re
 import sys
+import json
 
 
 def dump_data(path='configs'):
@@ -67,9 +68,32 @@ def dump_data(path='configs'):
     wf.close()
 
 
+def dump_fpm_history(dir='configs'):
+    wf = open('/tmp/data-fpm', 'w')
+
+    y = 0
+    for i in range(100, 400):
+        path = dir + "/fpm-history-%d.json" % i
+        if not os.path.exists(path):
+            continue
+
+        y+=1
+
+        with open(path) as f:
+            history = json.load(f)
+
+        for item in history:
+            if item['type']=='request_update':
+                t1 = float(item['time'])
+                wf.write("%f %f\n"%(t1, y))
+
+    wf.close()
+
+
 if __name__ == '__main__':
     if len(sys.argv) < 2:
         path = "configs"
     else:
         path = sys.argv[1]
     dump_data(path)
+    dump_fpm_history(path)

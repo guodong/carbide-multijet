@@ -70,12 +70,12 @@ def add_flow(dst, output):
     actions = 'output:' + output
     cmd = 'ovs-ofctl add-flow s table=100,ip,nw_dst=' + dst + ',actions=' + actions
     logger.info('add-flow dst=%s output=%s' % (str(dst), str(output)))
-    history_list_append_and_dump({
-        'type': 'add-flow',
-        'time': time.time(),
-        'dst': str(dst),
-        'output': str(output)
-    })
+    # history_list_append_and_dump({
+    #     'type': 'add-flow',
+    #     'time': time.time(),
+    #     'dst': str(dst),
+    #     'output': str(output)
+    # })
     # os.system(cmd)
     global_new_flows[dst] = int(output)
 
@@ -84,11 +84,11 @@ def delete_flow(dst):
     logger.info('delete route %s' % dst)
     cmd = 'ovs-ofctl del-flow s table=100,ip,nw_dst=' + dst
     # os.system(cmd)
-    history_list_append_and_dump({
-        'type': 'delete-flow',
-        'time': time.time(),
-        'dst': str(dst)
-    })
+    # history_list_append_and_dump({
+    #     'type': 'delete-flow',
+    #     'time': time.time(),
+    #     'dst': str(dst)
+    # })
     if dst in global_flows:
         global_new_flows[dst] = None
 
@@ -105,6 +105,11 @@ def request_update():
     logger.info("request_update %s" % str(diff_flows))
     url = 'http://localhost:8080/install'
     requests.post(url, json=diff_flows)
+    history_list_append_and_dump({
+        'type': 'request_update',
+        'time': time.time(),
+        'diff_flows': diff_flows
+    })
 
 
 def bytes2Ip(bts):
