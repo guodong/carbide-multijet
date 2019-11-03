@@ -1,23 +1,24 @@
 import os
 import re
+import sys
 
 
-def dump_data():
+def dump_data(path='configs'):
     data = {}
 
     for i in range(100, 400):
         print(i)
-        if not os.path.exists('configs/%d'%i):
+        if not os.path.exists(path + '/%d' % i):
             continue
 
         time_list = []
         start = end = None
         last_t = None
 
-        with open('configs/%d/multijet2.log'%i) as f:
+        with open(path + '/%d/multijet2.log' % i) as f:
             while True:
                 l = f.readline()
-                if l is None or l=="":
+                if l is None or l == "":
                     break
                 msg = None
                 if 'handle one message' in l:
@@ -37,9 +38,9 @@ def dump_data():
                             start = t1
                     last_t = t1
             time_list.append((start, last_t))
-            print(time_list)
+            # print(time_list)
 
-        data[i]=time_list
+        data[i] = time_list
 
     g_start = min(time_list[0][0] for time_list in data.values())
 
@@ -49,19 +50,23 @@ def dump_data():
         wf.write("%f %f\n" % (200 + i * 20, 0))
         wf.write("%f %f\n\n" % (200 + i * 20, 180))
 
-    y=0
+    y = 0
 
     for i in range(100, 400):
         if i not in data:
             continue
-        y+=1
+        y += 1
         time_list = data[i]
-        for start,end in time_list:
-            wf.write("%f %f\n" % (start-g_start, y))
+        for start, end in time_list:
+            wf.write("%f %f\n" % (start - g_start, y))
             wf.write("%f %f\n\n" % (end - g_start, y))
 
     wf.close()
 
 
-if __name__=='__main__':
-    dump_data()
+if __name__ == '__main__':
+    if len(sys.argv) < 2:
+        path = "configs"
+    else:
+        path = sys.argv[1]
+    dump_data(path)
