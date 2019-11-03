@@ -162,7 +162,7 @@ class RocketFuel(Cmd):
             ps = [str(p) for p in ports[id]]
             ps.append('controller')
             pss = ','.join(ps)
-            cmd2 = 'ovs-ofctl add-flow -OOpenFlow13 s priority=53333,ip,ip_proto=145,actions=output:%s'%pss
+            cmd2 = 'ovs-ofctl add-flow -OOpenFlow13 s priority=53333,ip,ip_proto=145,actions=output:%s' % pss
             c.exec_run(cmd2)
 
         # configure ospf rules
@@ -175,7 +175,7 @@ class RocketFuel(Cmd):
         if os.path.exists('configs'):
             shutil.rmtree('configs')
         utils.mkdir_p('configs/common')
-        os.system('cp ignored/preset/%s/* configs/common/'%(self.filename))
+        os.system('cp ignored/preset/%s/* configs/common/' % (self.filename))
         for r in self.routers.values():
             utils.mkdir_p('configs/' + r.id)
             with open('configs/' + r.id + '/zebra.conf', 'a') as f:
@@ -203,7 +203,7 @@ class RocketFuel(Cmd):
         print 'cleaning containers...'
 
         for name in self.containers:
-            print("clean container %s"%name)
+            print("clean container %s" % name)
             client.containers.get(name).remove(force=True)
 
         exit(0)
@@ -253,13 +253,12 @@ class RocketFuel(Cmd):
         resps = grequests.map(rs)
         print(resps)
 
-
     def do_link_down_test(self, line):
         """link down test"""
         links_list = list(sorted(self.topo.links.items()))
         random.seed(0)
         for index in range(20):
-            ri = random.randint(0, len(links_list)-1)
+            ri = random.randint(0, len(links_list) - 1)
             pair = links_list[ri]
             self._link_down(pair)
             for i in range(20):
@@ -272,6 +271,14 @@ class RocketFuel(Cmd):
 
     def do_eval3(self, line):
         """eval3"""
+        args = line.split()
+        if len(args) < 2:
+            print('error args')
+            return
+
+        cp_dir = args[0]
+        suffix = args[1]
+
         os.system('rm -f configs/common/pp')
         self.do_start_ryu2('')
         time.sleep(20)
@@ -281,6 +288,8 @@ class RocketFuel(Cmd):
         time.sleep(20)
         self.do_kill_ryu('')
         self.do_kill_ospf_and_server(None)
+
+        os.system('cp -r configs %s/log-flood-%s' % (cp_dir, suffix))
 
         os.system('touch configs/common/pp')
         self.do_start_ryu2('')
@@ -292,6 +301,7 @@ class RocketFuel(Cmd):
         self.do_kill_ryu('')
         self.do_kill_ospf_and_server(None)
 
+        os.system('cp -r configs %s/log-pp-%s' % (cp_dir, suffix))
 
     def do_link(self, line):
         """link down/up  host1 host2"""
@@ -329,7 +339,6 @@ class RocketFuel(Cmd):
             utils.nsenter_run(pid, "ifconfig %s up" % iname)
             print('up', n, iname)
 
-
     def do_start_ryu(self, line):
         """deprecated"""
         for r in self.routers.values():
@@ -344,7 +353,8 @@ class RocketFuel(Cmd):
         for r in self.routers.values():
             print 'start multijet2 for ' + r.id
             c = self.containers[r.id]
-            code, output = c.exec_run('ryu-manager multijet.multijet2', detach=True, environment=['PYTHONPATH=/'], workdir='/')
+            code, output = c.exec_run('ryu-manager multijet.multijet2', detach=True, environment=['PYTHONPATH=/'],
+                                      workdir='/')
             print(output)
 
     def do_remove_log(self, line):
@@ -372,7 +382,7 @@ class RocketFuel(Cmd):
 
     def do_exec(self, line):
         for r in self.routers.values():
-            print('exec cmd %s for %s'%(line, str(r.id)))
+            print('exec cmd %s for %s' % (line, str(r.id)))
             c = self.containers[r.id]
             code, output = c.exec_run(line)
             print(output)
@@ -435,8 +445,9 @@ class RocketFuel(Cmd):
                     ks = rules.setdefault(k, {})
                     ks[n] = output
 
-        self.container_ip = {n: str(client.containers.get(n).attrs['NetworkSettings']['Networks']['bridge']['IPAddress'])
-                        for n in self.routers}
+        self.container_ip = {
+            n: str(client.containers.get(n).attrs['NetworkSettings']['Networks']['bridge']['IPAddress'])
+            for n in self.routers}
         self.watch_pos = {}
         for n in self.routers:
             with open('configs/%s/multijet2.log' % n) as f:
@@ -456,10 +467,10 @@ class RocketFuel(Cmd):
             detail = {}
             for n in ks.keys():
                 t1, t2, last_changed_t2, stat = self._watch_install_and_finish(n)
-                if t2_mx<t2: t2_mx = t2
-                if t1_mn>t1: t1_mn = t1
+                if t2_mx < t2: t2_mx = t2
+                if t1_mn > t1: t1_mn = t1
                 delta_t = t2 - t1
-                print('node %s update time %f'%(n, delta_t))
+                print('node %s update time %f' % (n, delta_t))
                 detail[n] = {
                     't1': t1,
                     't2': t2,
@@ -468,7 +479,7 @@ class RocketFuel(Cmd):
                 }
 
             delta_t = t2_mx - t1_mn
-            print('converge time %f'% delta_t)
+            print('converge time %f' % delta_t)
 
             results.append({
                 'rules': rules_once,
@@ -501,7 +512,7 @@ class RocketFuel(Cmd):
                 break
         _, _, line = self._watch_wait_read(n, ('self.transceiver.dump',))
 
-        return t1, last_t2, last_changed_t2 , self._parse_statistics(line)
+        return t1, last_t2, last_changed_t2, self._parse_statistics(line)
 
     def _parse_statistics(self, line):
         send, recv = re.findall('=\[(\d+), (\d+), (\d+), (\d+), (\d+), (\d+)\]', line)
@@ -569,17 +580,17 @@ class RocketFuel(Cmd):
 
     def do_repeat_eval2_2times(self, line):
         """Batch evaluation"""
-        for i in range(3,20,2):
-            self.do_dump_random_path("%d %d %d"%(10, i, i))
+        for i in range(3, 20, 2):
+            self.do_dump_random_path("%d %d %d" % (10, i, i))
             os.system('rm -f configs/common/pp')
             self.do_start_ryu2('')
             time.sleep(20)
-            self.do_eval2('flood-node-10-31-%d.log'%(i))
+            self.do_eval2('flood-node-10-31-%d.log' % (i))
             self.do_kill_ryu('')
             os.system('touch configs/common/pp')
             self.do_start_ryu2('')
             time.sleep(20)
-            self.do_eval2('pp-node-10-31-%d.log'%(i))
+            self.do_eval2('pp-node-10-31-%d.log' % (i))
             self.do_kill_ryu('')
 
     def do_eval2(self, line):
@@ -590,7 +601,7 @@ class RocketFuel(Cmd):
 
         self.container_ip = {
             n: str(client.containers.get(n).attrs['NetworkSettings']['Networks']['bridge']['IPAddress'])
-            for n in self.routers }
+            for n in self.routers}
 
         self.watch_pos = {}
 
@@ -602,15 +613,15 @@ class RocketFuel(Cmd):
         watched_nodes = list(n for n in self.routers)
 
         config_path_length = self._get_config_path_length()
-        for i in range(config_path_length*3):
+        for i in range(config_path_length * 3):
             # rules_once = {n: {k: output} for n, output in ks.items()}
-            if i%3 == 0:
-                path = self._read_config_path(i//3)  # [(node, output)]
-                ip = '99.0.%d.0/24'% (i//3)
+            if i % 3 == 0:
+                path = self._read_config_path(i // 3)  # [(node, output)]
+                ip = '99.0.%d.0/24' % (i // 3)
                 rules_once = {n: {ip: output} for n, output in path}
                 eval_type = 'path'
                 # watched_nodes = list(n for n,output in path)
-            elif i%3 == 1:
+            elif i % 3 == 1:
                 eval_type = 'delete'
                 rules_once = {path[-1][0]: {ip: None}}
             else:
@@ -636,7 +647,7 @@ class RocketFuel(Cmd):
                 delta_t = t2 - t1
 
                 if last_changed_t2 is not None:
-                    if last_changed_t2_mx is None or last_changed_t2>last_changed_t2_mx:
+                    if last_changed_t2_mx is None or last_changed_t2 > last_changed_t2_mx:
                         last_changed_t2_mx = last_changed_t2
                 # print('t1', t1, 't2', t2)
                 print('node %s update time %f' % (n, delta_t))
@@ -678,7 +689,7 @@ class RocketFuel(Cmd):
     def _read_config_path(self, i):
         with open('configs/common/random_path.json') as f:
             data = json.load(f)
-        return [(str(n), int(output)) for n,output in data[i]]
+        return [(str(n), int(output)) for n, output in data[i]]
 
     def _get_config_path_length(self):
         with open('configs/common/random_path.json') as f:
@@ -700,23 +711,23 @@ class RocketFuel(Cmd):
         while len(paths) < num:
             select_len = random.randint(start, end)
             nodes = list(self.topo.nodes.keys())
-            r1 = random.randint(0, len(nodes)-1)
+            r1 = random.randint(0, len(nodes) - 1)
             sn = nodes[r1]
             path = []
             flags = {n: False for n in nodes}
             print('select_len', select_len)
             while len(path) < select_len:
                 flags[sn] = True
-                nsn = [(p1, p2[0]) for p1, p2 in self.topo.links.items() if p1[0]==sn and flags[p2[0]]==False]
-                if len(nsn)==0:
+                nsn = [(p1, p2[0]) for p1, p2 in self.topo.links.items() if p1[0] == sn and flags[p2[0]] == False]
+                if len(nsn) == 0:
                     break
-                r2 = random.randint(0, len(nsn)-1)
+                r2 = random.randint(0, len(nsn) - 1)
                 ns = nsn[r2]
                 path.append(ns[0])
                 sn = ns[1]
             print('path', path)
 
-            if len(path)>= start:
+            if len(path) >= start:
                 paths.append(path)
             print('len(paths)', len(paths))
         with open('configs/common/random_path.json', 'w') as f:

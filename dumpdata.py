@@ -38,7 +38,7 @@ def dump_data(path='configs'):
                             start = t1
                     last_t = t1
             time_list.append((start, last_t))
-            # print(time_list)
+            print('len(time_list)=', len(time_list))
 
         data[i] = time_list
 
