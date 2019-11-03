@@ -65,7 +65,7 @@ class PushPullECSMgr(BaseECSMgr):
             self._ecs_changed = False
             try:
                 msg = self.queue.get(timeout=5)
-                log('handle one message')
+                log('handle one message, start')
                 # debug(msg)
             except Exception:
                 log(self.dump_ecs())
@@ -83,7 +83,7 @@ class PushPullECSMgr(BaseECSMgr):
             else:
                 log('error queue message type')
             # debug(self.dump_ecs())
-            log('handle one message, %s'%('ecs_changed' if self._ecs_changed else 'no_ecs_change'))
+            log('handle one message, end, %s'%('ecs_changed' if self._ecs_changed else 'no_ecs_change'))
 
     def check(self):
         if len(self._ecs_requests)>0:
@@ -290,8 +290,6 @@ class FloodECSMgr(BaseECSMgr):
             if msg is None:
                 try:
                     msg = self.queue.get(timeout=5)  # timeout above 1 seconds
-                    log('handle one message')
-                    # debug(msg)
                 except Exception:
                     log(self.dump_ecs())
                     log("self.transceiver.dump: %s" % str(self.transceiver.dump()))
@@ -299,6 +297,8 @@ class FloodECSMgr(BaseECSMgr):
 
                     self._reset_tmp_save_flood_ecs()  # clear _tmp_save_flood_ecs
                     continue
+
+            log('handle one message, start')
 
             if msg['type'] == 'local_update':
                 self.update_local_rules(msg['rules'])
@@ -315,7 +315,8 @@ class FloodECSMgr(BaseECSMgr):
             except Exception:
                 self._fix_last_updated_unknown_next_hosts()  # fix ECS with self._tmp_save_flood_ecs, putting it here is to make queue empty first
                 msg = None
-            log('handle one message, %s'%('ecs_changed' if self._ecs_changed else 'no_ecs_change'))
+
+            log('handle one message, end, %s'%('ecs_changed' if self._ecs_changed else 'no_ecs_change'))
 
     def _reset_tmp_save_flood_ecs(self):
         self._tmp_save_flood_ecs = {}
