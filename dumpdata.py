@@ -59,7 +59,7 @@ def dump_data(path='configs',  begin=200, interval=30):
             continue
         y += 1
         time_list = data[i]
-        wf1 = open('/tmp/data-%d' % i, 'w')
+        wf1 = open('/tmp/data-%d-%d' % (y, i), 'w')
         for start, end in time_list:
             wf.write("%f %f\n" % (start - time_min, y))
             wf.write("%f %f\n\n" % (end - time_min, y))
@@ -72,7 +72,7 @@ def dump_data(path='configs',  begin=200, interval=30):
 def dump_fpm_history(dir='configs', begin=200, interval=30):
     data = {}
     for i in range(100, 400):
-        path = dir + "/fpm-history-%d.json" % i
+        path = dir + "/common/fpm-history-%d.json" % i
         if not os.path.exists(path):
             continue
 
@@ -81,13 +81,13 @@ def dump_fpm_history(dir='configs', begin=200, interval=30):
 
         time_list = []
         for item in history:
-            if item['type']=='request_update':
+            if str(item['type'])=='request_update':
                 t1 = float(item['time'])
                 time_list.append(t1)
         data[i]=time_list
 
     time_min = min(item[0] for item in data.values())
-    time_max = min(item[-1] for item in data.values())
+    time_max = max(item[-1] for item in data.values())
 
     with open('/tmp/data-fpm-line', 'w') as f:
         dump_line(f, begin, interval, time_max-time_min)

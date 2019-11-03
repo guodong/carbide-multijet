@@ -235,7 +235,7 @@ class PushPullECSMgr(BaseECSMgr):
         ret = []
         for r, ec in list(self._ecs.items()):
             r12 = self._route_combine(r, route)
-            if r12 is not None:
+            if r12 is not None and r12 != r:
                 changed_space = ec.space & space
                 if len(changed_space) > 0:
 
@@ -250,8 +250,14 @@ class PushPullECSMgr(BaseECSMgr):
         return ret
 
     def _route_combine(self, r1, r2):
-        print('r1', r1, 'r2', r2)
+        # print('r1', r1, 'r2', r2)
         assert len(r1) > 0 and len(r2) > 0 and r1[0][0] != r2[0][0], "format error"
+
+        for np in r2:
+            if np[0]==self.node_id:
+                log("receive a back route")
+                return None
+
         r2_n = r2[0][0]
         i = 1
         while i < len(r1):
@@ -261,6 +267,7 @@ class PushPullECSMgr(BaseECSMgr):
         if i < len(r1):
             # assert i==1, "format error" TODO:
             if i!=1:
+                log('error, i!=1')
                 return None
             if r2[0][1] is None:
                 return r1[:i]
