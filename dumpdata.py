@@ -1,10 +1,12 @@
+#!/usr/bin/env python
 import os
 import re
 import sys
 import json
+import argparse
 
 
-def dump_data(path='configs'):
+def dump_data(path='configs',  begin=200, interval=30):
     data = {}
 
     for i in range(100, 400):
@@ -43,13 +45,12 @@ def dump_data(path='configs'):
 
         data[i] = time_list
 
-    g_start = min(time_list[0][0] for time_list in data.values())
+    time_min = min(time_list[0][0] for time_list in data.values())
+    time_max = max(time_list[-1][1] for time_list in data.values())
 
     wf = open('/tmp/data.txt', 'w')
 
-    for i in range(40):
-        wf.write("%f %f\n" % (200 + i * 20, 0))
-        wf.write("%f %f\n\n" % (200 + i * 20, 180))
+    dump_line(wf, begin, interval, time_max-time_min)
 
     y = 0
 
@@ -60,40 +61,65 @@ def dump_data(path='configs'):
         time_list = data[i]
         wf1 = open('/tmp/data-%d' % i, 'w')
         for start, end in time_list:
-            wf.write("%f %f\n" % (start - g_start, y))
-            wf.write("%f %f\n\n" % (end - g_start, y))
-            wf1.write("%f %f\n"%(start-g_start, end-g_start))
+            wf.write("%f %f\n" % (start - time_min, y))
+            wf.write("%f %f\n\n" % (end - time_min, y))
+            wf1.write("%f %f\n"%(start-time_min, end-time_min))
         wf1.close()
 
     wf.close()
 
 
-def dump_fpm_history(dir='configs'):
-    wf = open('/tmp/data-fpm', 'w')
-
-    y = 0
+def dump_fpm_history(dir='configs', begin=200, interval=30):
+    data = {}
     for i in range(100, 400):
         path = dir + "/fpm-history-%d.json" % i
         if not os.path.exists(path):
             continue
 
-        y+=1
-
         with open(path) as f:
             history = json.load(f)
 
+        time_list = []
         for item in history:
             if item['type']=='request_update':
                 t1 = float(item['time'])
-                wf.write("%f %f\n"%(t1, y))
+                time_list.append(t1)
+        data[i]=time_list
+
+    time_min = min(item[0] for item in data.values())
+    time_max = min(item[-1] for item in data.values())
+
+    with open('/tmp/data-fpm-line', 'w') as f:
+        dump_line(f, begin, interval, time_max-time_min)
+
+    wf = open('/tmp/data-fpm', 'w')
+
+    y = 0
+    for i in range(100, 400):
+        if not i in data:
+            continue
+        print(i)
+
+        y+=1
+        for t in data[i]:
+            wf.write("%f %f\n"%(t-time_min, y))
 
     wf.close()
 
 
+def dump_line(f, begin, interval, total_time, y1=0, y2=180):
+    while begin < total_time:
+        f.write("%f %f\n"% (begin, y1))
+        f.write("%f %f\n\n" % (begin, y2))
+        begin += interval
+
+
 if __name__ == '__main__':
-    if len(sys.argv) < 2:
-        path = "configs"
-    else:
-        path = sys.argv[1]
-    dump_data(path)
-    dump_fpm_history(path)
+    parser = argparse.ArgumentParser(description="dump data")
+    parser.add_argument("-t", "--begin", type=int, default=200)
+    parser.add_argument("-i", "--interval", type=int, default=30)
+    parser.add_argument("dir", type=str, help="data directory")
+    args = parser.parse_args()
+
+    dump_data(args.dir, args.begin, args.interval)
+    dump_fpm_history(args.dir, args.begin, args.interval)
