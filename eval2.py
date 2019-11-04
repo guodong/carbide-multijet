@@ -76,7 +76,7 @@ class RocketFuel(Cmd):
 
     def start(self):
         # generate ospf config file
-        self.gen_config()
+        self._make_configs_directory()
 
         for r in self.routers.values():
             print 'starting ' + r.id
@@ -145,7 +145,10 @@ class RocketFuel(Cmd):
             i = i + 1
 
         topo.save('configs/common/topo.json')
+
         self.topo = topo
+
+        self._write_quagga_configs()
 
         ports = topo.spanning_tree()
         print(ports)
@@ -171,33 +174,32 @@ class RocketFuel(Cmd):
             c = self.containers[id]
             c.exec_run('/bootstrap/start.py', detach=True)
 
-    def gen_config(self):
+    def _make_configs_directory(self):
         if os.path.exists('configs'):
             shutil.rmtree('configs')
         utils.mkdir_p('configs/common')
         os.system('cp ignored/preset/%s/* configs/common/' % (self.filename))
         for r in self.routers.values():
             utils.mkdir_p('configs/' + r.id)
-            with open('configs/' + r.id + '/zebra.conf', 'a') as f:
+
+    def _write_quagga_configs(self):
+        for node_id, ports in self.topo.nodes.items():
+            print('write quagga configs', node_id)
+            with open('configs/' + node_id + '/zebra.conf', 'w') as f:
                 f.write('hostname Router\npassword zebra\nenable password zebra')
 
-            with open('configs/' + r.id + '/ospfd.conf', 'a') as f:
-                f.write('hostname ospfd\npassword zebra\nlog stdout\nrouter ospf\n')
+            with open('configs/' + node_id + '/ospfd.conf', 'w') as f:
+                f.write('hostname ospfd\npassword zebra\nlog stdout\n')
 
-        i = 0
-        j = 0
-        for l in self.links:
-            k = 1
-            for r in l:
-                ip = '1.' + str(j) + '.' + str(i) + '.' + str(k) + '/24'
-                with open('configs/' + r.id + '/ospfd.conf', 'a') as f:
-                    f.write(' network ' + ip + ' area 0\n')
+                for port_id, port in ports.items():
+                    if port['type']=='internal':
+                        f.write('!\ninterface %s\n  ip ospf hello-interval 4\n  ip ospf dead-interval 10\n' % port['name'])
 
-                k = k + 1
-            if i == 254:
-                j += 1
-                i = 0
-            i = i + 1
+                f.write('!\nrouter ospf\n')
+
+                for port_id, port in ports.items():
+                    if port['type']=='internal':
+                        f.write(' network ' + port['ip'] + ' area 0\n')
 
     def stop(self):
         print 'cleaning containers...'
@@ -210,6 +212,9 @@ class RocketFuel(Cmd):
 
     def emptyline(self):
         return ""
+
+    def do_write_quagga_configs(self, line):
+        self._write_quagga_configs()
 
     def do_start_ospf(self, line):
         """ start ospf process"""
@@ -524,7 +529,7 @@ class RocketFuel(Cmd):
         while True:
             t = self._watch_for(n, words)
             if t is None:
-                time.sleep(1)
+                time.sleep(0.1)
             else:
                 break
         return t
@@ -633,7 +638,7 @@ class RocketFuel(Cmd):
             print('eval once')
             print(rules_once)  # {node_id:  {'match': output_port}}
             self._eval_once(rules_once)
-            time.sleep(5)
+            time.sleep(4)
             t1_mn = float('inf')
             t2_mx = 0
             last_changed_t2_mx = None
