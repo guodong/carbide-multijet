@@ -192,13 +192,14 @@ class RocketFuel(Cmd):
                 f.write('hostname ospfd\npassword zebra\nlog stdout\n')
 
                 for port_id, port in ports.items():
-                    if port['type']=='internal':
-                        f.write('!\ninterface %s\n  ip ospf hello-interval 4\n  ip ospf dead-interval 10\n' % port['name'])
+                    if port['type'] == 'internal':
+                        f.write(
+                            '!\ninterface %s\n  ip ospf hello-interval 4\n  ip ospf dead-interval 10\n' % port['name'])
 
                 f.write('!\nrouter ospf\n')
 
                 for port_id, port in ports.items():
-                    if port['type']=='internal':
+                    if port['type'] == 'internal':
                         f.write(' network ' + port['ip'] + ' area 0\n')
 
     def stop(self):
@@ -260,19 +261,45 @@ class RocketFuel(Cmd):
 
     def do_link_down_test(self, line):
         """link down test"""
+        args = line.split()
+        if len(args) < 1:
+            print('link_down_test file.name')
+            return
+
+        history_file_name = args[0]
+
+        history = []
+
         links_list = list(sorted(self.topo.links.items()))
         random.seed(0)
         for index in range(20):
             ri = random.randint(0, len(links_list) - 1)
             pair = links_list[ri]
+
+            history.append({
+                'pair': pair,
+                'op': 'down',
+                'time': time.time()
+            })
+
             self._link_down(pair)
             for i in range(20):
                 print(i)
                 time.sleep(1)
+
+            history.append({
+                'pair': pair,
+                'op': 'down',
+                'time': time.time()
+            })
+
             self._link_up(pair)
             for i in range(20):
                 print(i)
                 time.sleep(1)
+
+        with open(history_file_name, 'w') as f:
+            json.dump(history, f, indent=2)
 
     def do_eval3(self, line):
         """eval3"""
@@ -289,7 +316,7 @@ class RocketFuel(Cmd):
         time.sleep(20)
         self.do_start_ospf_and_server_async(None)
         time.sleep(200)
-        self.do_link_down_test(None)
+        self.do_link_down_test('eval3-flood-link-test.log')
         time.sleep(20)
         self.do_kill_ryu('')
         self.do_kill_ospf_and_server(None)
@@ -301,7 +328,7 @@ class RocketFuel(Cmd):
         time.sleep(20)
         self.do_start_ospf_and_server_async(None)
         time.sleep(200)
-        self.do_link_down_test(None)
+        self.do_link_down_test('eval3-pp-link-test.log')
         time.sleep(20)
         self.do_kill_ryu('')
         self.do_kill_ospf_and_server(None)
