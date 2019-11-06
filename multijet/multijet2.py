@@ -66,6 +66,13 @@ class MultijetServer(ControllerBase):
         os.system('ospfd -d -f /etc/quagga/ospfd.conf')
         return 'ok'
 
+    @route('test', '/startreplay', methods=['GET'])
+    def start_replay(self, req, **kwargs):
+        t = float(req.params['time'])
+        os.system('python /fpm/replay.py %f &'%t)
+        return 'ok'
+
+
 class PacketTransceiver(Transceiver):
     UNICAST = 144
     FLOOD_NEIGHBOR = 143

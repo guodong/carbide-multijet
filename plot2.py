@@ -272,6 +272,31 @@ def plot_flood_and_pp_average():
     for i in range(3):
         subfunc(d1[i], d2[i], prefix='result-10-32-' + prefix[i], xticks=xticks, title_types=title_types_l[i])
 
+def test_plot():
+    with open('/home/yutao/tmp/output2/tmp1/time_list') as f:
+        pp = json.load(f)
+
+    with open('/home/yutao/tmp/output2/tmp/time_list') as f:
+        flood = json.load(f)
+
+    plt.clf()
+    print()
+    y1 = pp['t2l'][1:]
+    x1 = [i+0.15 for i in range(len(y1))]
+    plt.bar(x1,y1, width=0.3, label='PushPull', color='r')
+
+    y1 = flood['t2l'][1:]
+    x1 = [i-0.15 for i in range(len(y1))]
+    plt.bar(x1,y1, width=0.3, label='Flood', color='b')
+    plt.legend()
+    plt.ylabel('Time (s)')
+    plt.xlabel('Test number')
+
+    plt.title('OSPF link down and up, ECS-stabilized time')
+
+    plt.savefig('ospf-ecs-time.png')
+    plt.show()
+
 
 if __name__ == '__main__':
     # plt.boxplot([[1,2,3,4], [1,2,3,4]], positions=[1,3], widths=0.5, patch_artist=True)
@@ -284,4 +309,5 @@ if __name__ == '__main__':
     # ospf()
     # ospf()
     # singlepath('10-31-3')
-    plot_flood_and_pp_average()
+    # plot_flood_and_pp_average()
+    test_plot()

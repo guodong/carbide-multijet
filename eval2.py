@@ -191,10 +191,10 @@ class RocketFuel(Cmd):
             with open('configs/' + node_id + '/ospfd.conf', 'w') as f:
                 f.write('hostname ospfd\npassword zebra\nlog stdout\n')
 
-                for port_id, port in ports.items():
-                    if port['type'] == 'internal':
-                        f.write(
-                            '!\ninterface %s\n  ip ospf hello-interval 4\n  ip ospf dead-interval 10\n' % port['name'])
+                # for port_id, port in ports.items():
+                #     if port['type'] == 'internal':
+                #         f.write(
+                #             '!\ninterface %s\n  ip ospf hello-interval 4\n  ip ospf dead-interval 10\n' % port['name'])
 
                 f.write('!\nrouter ospf\n')
 
@@ -283,7 +283,7 @@ class RocketFuel(Cmd):
             })
 
             self._link_down(pair)
-            for i in range(20):
+            for i in range(60):
                 print(i)
                 time.sleep(1)
 
@@ -294,7 +294,7 @@ class RocketFuel(Cmd):
             })
 
             self._link_up(pair)
-            for i in range(20):
+            for i in range(120):
                 print(i)
                 time.sleep(1)
 
@@ -313,14 +313,13 @@ class RocketFuel(Cmd):
 
         os.system('rm -f configs/common/pp')
         self.do_start_ryu2('')
-        time.sleep(20)
+        time.sleep(5)
         self.do_start_ospf_and_server_async(None)
-        time.sleep(200)
-        self.do_link_down_test('eval3-flood-link-test.log')
         time.sleep(20)
+        self.do_link_down_test('eval3-flood-link-test.log')
+        # time.sleep(20)
         self.do_kill_ryu('')
         self.do_kill_ospf_and_server(None)
-
         os.system('cp -r configs %s/log-flood-%s' % (cp_dir, suffix))
 
         os.system('touch configs/common/pp')
@@ -334,6 +333,56 @@ class RocketFuel(Cmd):
         self.do_kill_ospf_and_server(None)
 
         os.system('cp -r configs %s/log-pp-%s' % (cp_dir, suffix))
+
+    def do_replay(self, line):
+        args = line.split()
+        if len(args) < 2:
+            print('error args')
+            return
+
+        cp_dir = args[0]
+        suffix = args[1]
+
+        if len(args) >=3:
+            os.system('touch configs/common/pp')
+        self.do_start_ryu2('')
+        time.sleep(5)
+        self.do_replay_request('replay.log')
+        time.sleep(20)
+        self.do_link_down_test('eval3-pp-link-test.log')
+        # time.sleep(20)
+        self.do_kill_ryu('')
+        self.do_kill_ospf_and_server(None)
+
+        os.system('cp -r configs %s/log-pp-%s' % (cp_dir, suffix))
+
+    def do_replay_request(self, line):
+        args = line.split()
+        if len(args) < 1:
+            print('link_down_test file.name')
+            return
+
+        os.system("rm -f configs/common/fpm-replay-*.json")
+        urls = []
+        t = time.time()
+        for c in self.containers:
+            ip = str(client.containers.get(c).attrs['NetworkSettings']['Networks']['bridge']['IPAddress'])
+            urls.append('http://' + ip + ':8080/startreplay?time=%f'% t)
+        rs = (grequests.get(u) for u in urls)
+        resps = grequests.map(rs)
+        print(resps)
+
+        with open(args[0], 'w') as f:
+            f.write("%f"%t)
+
+        for n in self.topo.nodes:
+            while True:
+                if os.path.exists('configs/common/fpm-replay-%s.json'%str(n)):
+                    break
+                else:
+                    time.sleep(1)
+
+        time.sleep(55)
 
     def do_link(self, line):
         """link down/up  host1 host2"""
