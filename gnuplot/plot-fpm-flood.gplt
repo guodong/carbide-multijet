@@ -1,0 +1,7 @@
+#!/usr/bin/env gnuplot
+
+set term post eps enhanced
+set term post size 12,9
+set style line 1 lc rgb 'black' pt 1   # square
+set output "fig-flood-fpm.eps"
+plot "/home/yutao/tmp/output1/data-flood-test-line.dat" with lines, "/home/yutao/tmp/output1/data-flood-update-point.dat" with points

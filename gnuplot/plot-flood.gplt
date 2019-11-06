@@ -1,0 +1,7 @@
+#!/usr/bin/env gnuplot
+
+set term post eps enhanced
+set term post size 12,9
+
+set output "fig-flood.eps"
+plot "/home/yutao/tmp/output1/data-flood-multijet-log.dat" with lines

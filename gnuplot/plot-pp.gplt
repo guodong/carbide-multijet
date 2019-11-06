@@ -1,0 +1,8 @@
+#!/usr/bin/env gnuplot
+
+set term post eps enhanced
+set term post size 12,9
+
+set output "fig-pp.eps"
+# plot "data-pp" with lines
+plot "/home/yutao/tmp/output1/data-pp-multijet-log.dat" with lines

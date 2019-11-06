@@ -1,0 +1,11 @@
+#!/usr/bin/env gnuplot
+
+set term post eps enhanced color
+set term post size 12,9
+
+set xlabel 'Time(s)'
+
+set ylabel 'Node'
+
+set output "fig-rb.eps"
+plot "/home/yutao/tmp/output2/tmp/log-no-changed-420.dat" with lines lc "green", "/home/yutao/tmp/output2/tmp/log-changed-420.dat" with lines lc "red"

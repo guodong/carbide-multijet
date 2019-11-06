@@ -1,0 +1,14 @@
+#!/usr/bin/env gnuplot
+
+set term post eps enhanced
+set term post size 12,9
+set style line 1 lc rgb 'black' pt 1   # square
+set output "fig-pp-fpm.eps"
+
+
+set xlabel 'Time(s)'
+
+set ylabel 'Node'
+
+# plot "data-fpm-line-pp" with lines, "data-fpm-pp" with points
+plot "/home/yutao/tmp/output1/data-pp-test-line.dat" with lines, "/home/yutao/tmp/output1/data-pp-update-point.dat" with points
