@@ -270,11 +270,23 @@ class RocketFuel(Cmd):
 
         history = []
 
+        with open('configs/common/spanningtree.json') as f:
+            spanningtree = json.load(f)
+
         links_list = list(sorted(self.topo.links.items()))
         random.seed(0)
-        for index in range(20):
-            ri = random.randint(0, len(links_list) - 1)
-            pair = links_list[ri]
+
+        for index in range(10):
+
+            while True:
+                ri = random.randint(0, len(links_list) - 1)
+                pair = links_list[ri]
+                s,e  = pair
+                if s[1] in spanningtree[s[0]] and e[1] in spanningtree[e[0]]:
+                    print("avoid spanningtree link")
+                else:
+                    print(s, e)
+                    break
 
             history.append({
                 'pair': pair,
@@ -313,9 +325,9 @@ class RocketFuel(Cmd):
 
         os.system('rm -f configs/common/pp')
         self.do_start_ryu2('')
-        time.sleep(5)
-        self.do_start_ospf_and_server_async(None)
         time.sleep(20)
+        self.do_start_ospf_and_server_async(None)
+        time.sleep(200)
         self.do_link_down_test('eval3-flood-link-test.log')
         # time.sleep(20)
         self.do_kill_ryu('')
@@ -328,11 +340,88 @@ class RocketFuel(Cmd):
         self.do_start_ospf_and_server_async(None)
         time.sleep(200)
         self.do_link_down_test('eval3-pp-link-test.log')
-        time.sleep(20)
+        # time.sleep(20)
         self.do_kill_ryu('')
         self.do_kill_ospf_and_server(None)
 
         os.system('cp -r configs %s/log-pp-%s' % (cp_dir, suffix))
+
+    def do_ospf_eval_dumpdata(self, line):
+        os.system('rm -f configs/common/pp')
+        self.do_start_ryu2('')
+        time.sleep(20)
+        self.do_start_ospf_and_server_async(None)
+        time.sleep(200)
+        self.do_link_down_test2('configs/common/eval3-flood-link-down.log')
+        # time.sleep(20)
+        self.do_kill_ryu('')
+
+    def do_link_down_test2(self, line):
+        """link down test"""
+        args = line.split()
+        if len(args) < 1:
+            print('link_down_test file.name')
+            return
+
+        history_file_name = args[0]
+
+        history = []
+
+        with open('configs/common/spanningtree.json') as f:
+            spanningtree = json.load(f)
+
+        links_list = list(sorted(self.topo.links.items()))
+        random.seed(0)
+
+        downed = set()
+
+        for index in range(10):
+
+            while True:
+                ri = random.randint(0, len(links_list) - 1)
+                pair = links_list[ri]
+                s, e = pair
+                if s[1] in spanningtree[s[0]] and e[1] in spanningtree[e[0]]:
+                    print("avoid spanningtree link")
+                elif pair in downed:
+                    print("port already down")
+                else:
+                    print(s, e)
+                    break
+
+            history.append({
+                'pair': pair,
+                'op': 'down',
+                'time': time.time()
+            })
+
+            self._link_down(pair)
+            for i in range(10):
+                print(i)
+                time.sleep(1)
+
+            downed.add(pair)
+            # history.append({
+            #     'pair': pair,
+            #     'op': 'down',
+            #     'time': time.time()
+            # })
+            #
+            # self._link_up(pair)
+            # for i in range(120):
+            #     print(i)
+            #     time.sleep(1)
+
+        with open(history_file_name, 'w') as f:
+            json.dump(history, f, indent=2)
+
+        time.sleep(5)
+        self.do_kill_ospf_and_server(None)
+        os.system('mkdir -p configs/common/replay')
+        os.system('cp configs/common/fpm-history*.json configs/common/replay')
+
+        for pair in downed:
+            self._link_up(pair)
 
     def do_replay(self, line):
         args = line.split()
@@ -367,7 +456,7 @@ class RocketFuel(Cmd):
         t = time.time()
         for c in self.containers:
             ip = str(client.containers.get(c).attrs['NetworkSettings']['Networks']['bridge']['IPAddress'])
-            urls.append('http://' + ip + ':8080/startreplay?time=%f'% t)
+            urls.append('http://' + ip + ':8080/startreplay?time=%f'% (t+10))
         rs = (grequests.get(u) for u in urls)
         resps = grequests.map(rs)
         print(resps)
