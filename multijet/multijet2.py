@@ -69,7 +69,9 @@ class MultijetServer(ControllerBase):
     @route('test', '/startreplay', methods=['GET'])
     def start_replay(self, req, **kwargs):
         t = float(req.params['time'])
-        os.system('python /fpm/replay.py %f &'%t)
+        s = float(req.params['start'])
+        log("start replay at %f %f" % (t,s))
+        os.system('python /fpm/replay.py %f %f&'%(t,s))
         return 'ok'
 
 
