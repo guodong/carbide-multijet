@@ -434,25 +434,25 @@ class RocketFuel(Cmd):
         os.system('rm -f configs/common/pp')
         self.do_start_ryu2('')
         time.sleep(20)
-        self.do_start_ospf_and_server_async(None)
-        time.sleep(200)
+        # self.do_start_ospf_and_server_async(None)
+        # time.sleep(200)
         self.do_replay_request('configs/common/replay.log')
         # self.do_link_down_test('eval3-flood-link-test.log')
         # time.sleep(20)
         self.do_kill_ryu('')
-        self.do_kill_ospf_and_server(None)
+        # self.do_kill_ospf_and_server(None)
         os.system('cp -r configs %s/log-replay-flood-%s' % (cp_dir, suffix))
 
         os.system('touch configs/common/pp')
         self.do_start_ryu2('')
         time.sleep(20)
-        self.do_start_ospf_and_server_async(None)
-        time.sleep(200)
+        # self.do_start_ospf_and_server_async(None)
+        # time.sleep(200)
         self.do_replay_request('configs/common/replay.log')
         # self.do_link_down_test('eval3-pp-link-test.log')
         # time.sleep(20)
         self.do_kill_ryu('')
-        self.do_kill_ospf_and_server(None)
+        # self.do_kill_ospf_and_server(None)
         os.system('cp -r configs %s/log-replay-pp-%s' % (cp_dir, suffix))
 
     def do_replay_request(self, line):
@@ -476,6 +476,9 @@ class RocketFuel(Cmd):
         os.system("rm -f configs/common/fpm-replay-*.json")
         urls = []
         t = time.time()
+
+        print('g_start=', g_start, 'time=', t)
+
         for c in self.containers:
             ip = str(client.containers.get(c).attrs['NetworkSettings']['Networks']['bridge']['IPAddress'])
             urls.append('http://' + ip + ':8080/startreplay?time=%f&start=%f'% (t+10, g_start))

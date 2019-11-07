@@ -54,7 +54,7 @@ def main(relative_time, g_start):
             'diff_flows': diff_flows
         })
 
-    with open('/common/replay/fpm-replay-%s.json' % node_id, 'w') as f:
+    with open('/common/fpm-replay-%s.json' % node_id, 'w') as f:
         json.dump(replay_history, f, indent=2)
 
 
