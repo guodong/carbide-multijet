@@ -128,6 +128,29 @@ def dump_data2(path='configs', history_file='', output='/tmp/output', prefix='da
     print('time_min', time_min)
 
 
+def dump_data3(path='configs',  output='/tmp/output', prefix='data-flood'):
+    if not os.path.exists(output):
+        os.system('mkdir -p ' + args.output)
+
+    nodes = get_nodes(path)
+
+    fpm_history = get_fpm_history(nodes, path)  # node_id : [update_times]
+
+    time_min = min(l[0] for l in fpm_history.values())
+
+    with open('%s/%s-update-point.dat' % (output, prefix), 'w') as f:
+        y = 0
+        for node_id in nodes:
+            y += 1
+            for t in fpm_history[node_id]:
+                f.write("%f %f\n" % (t - time_min, y))
+
+    with open('%s/%s-fpm_history.json' % (output, prefix), 'w') as f:
+        json.dump(fpm_history, f)
+
+    print('time_min', time_min)
+
+
 def dump_data(path='configs', begin=200, interval=30):
     data = {}
 
@@ -336,9 +359,9 @@ if __name__ == '__main__':
     # parser.add_argument("-t", "--begin", type=int, default=200)
     # parser.add_argument("-i", "--interval", type=int, default=90)
     parser.add_argument("-o", "--output", type=str, default='/tmp/output')
-    parser.add_argument("-s", "--suffix", type=str, default='')
+    # parser.add_argument("-s", "--suffix", type=str, default='')
     parser.add_argument("-p", "--prefix", type=str)
-    parser.add_argument("-f", "--history", type=str)
+    # parser.add_argument("-f", "--history", type=str)
     parser.add_argument("dir", type=str, help="data directory")
     args = parser.parse_args()
 
