@@ -329,8 +329,8 @@ def test(ttt='flood'):
 
 if __name__ == '__main__':
 
-    test('pp')
-    exit(0)
+    # test('pp')
+    # exit(0)
 
     parser = argparse.ArgumentParser(description="dump data")
     # parser.add_argument("-t", "--begin", type=int, default=200)

@@ -104,7 +104,7 @@ def request_update():
         return
     logger.info("request_update %s" % str(diff_flows))
     url = 'http://localhost:8080/install'
-    requests.post(url, json=diff_flows)
+    # requests.post(url, json=diff_flows)
     history_list_append_and_dump({
         'type': 'request_update',
         'time': time.time(),

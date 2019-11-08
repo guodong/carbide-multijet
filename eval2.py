@@ -301,7 +301,7 @@ class RocketFuel(Cmd):
 
             history.append({
                 'pair': pair,
-                'op': 'down',
+                'op': 'up',
                 'time': time.time()
             })
 
@@ -351,9 +351,76 @@ class RocketFuel(Cmd):
         time.sleep(20)
         self.do_start_ospf_and_server_async(None)
         time.sleep(200)
-        self.do_link_down_test2('configs/common/eval3-flood-link-down.log')
+        self.do_link_down_test3('configs/common/eval3-flood-link-down.log')
         # time.sleep(20)
         self.do_kill_ryu('')
+        self.do_kill_ospf_and_server(None)
+        # os.system('cp -r configs ~/tmp/log-ospf-eval-dumpdata5')
+        # self.do_replay("~/tmp  10down-replay5")
+        
+
+    def do_link_down_test3(self, line):
+        """link down test"""
+        args = line.split()
+        if len(args) < 1:
+            print('link_down_test file.name')
+            return
+
+        history_file_name = args[0]
+
+        history = []
+
+        with open('configs/common/spanningtree.json') as f:
+            spanningtree = json.load(f)
+
+        links_list = list(sorted(self.topo.links.items()))
+        random.seed(0)
+
+        downed = set()
+
+        for index in range(100):
+            
+            select_list = [p for p in links_list 
+                if not (p[0][1] in spanningtree[p[0][0]] and p[1][1] in spanningtree[p[1][0]]) and p not in downed]
+            if len(select_list)==0:
+                break
+            ri = random.randint(0, len(select_list) - 1)
+            pair = select_list[ri]
+            
+            history.append({
+                'pair': pair,
+                'op': 'down',
+                'time': time.time()
+            })
+
+            self._link_down(pair)
+            for i in range(20):
+                print(i)
+                time.sleep(1)
+
+            downed.add(pair)
+            # history.append({
+            #     'pair': pair,
+            #     'op': 'up',
+            #     'time': time.time()
+            # })
+            
+            # self._link_up(pair)
+            # for i in range(60):
+            #     print(i)
+            #     time.sleep(1)
+
+        with open(history_file_name, 'w') as f:
+            json.dump(history, f, indent=2)
+
+        time.sleep(5)
+        self.do_kill_ospf_and_server(None)
+        os.system('mkdir -p configs/common/replay')
+        os.system('cp configs/common/fpm-history*.json configs/common/replay')
+
+        for pair in downed:
+            self._link_up(pair)
+
 
     def do_link_down_test2(self, line):
         """link down test"""
@@ -370,7 +437,7 @@ class RocketFuel(Cmd):
             spanningtree = json.load(f)
 
         links_list = list(sorted(self.topo.links.items()))
-        random.seed(0)
+        # random.seed(0)
 
         downed = set()
 
@@ -395,14 +462,14 @@ class RocketFuel(Cmd):
             })
 
             self._link_down(pair)
-            for i in range(10):
+            for i in range(20):
                 print(i)
                 time.sleep(1)
 
             downed.add(pair)
             # history.append({
             #     'pair': pair,
-            #     'op': 'down',
+            #     'op': 'up',
             #     'time': time.time()
             # })
             #

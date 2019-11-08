@@ -43,10 +43,10 @@ class BaseECSMgr(object):
     def on_recv(self, data, source): raise NotImplementedError
 
     def dump_ecs(self):
-        s = "=======dumpecs===%s==============\n"%self.node_id
-        for ec in self._ecs.values():
-            s += "%s <----> %s\n"%(str(ec.space), str(ec.route))
-        s += "============%s==============\n" % self.node_id
+        s = "=======dumpecs===%s===len(ecs)=%d===\n" % (self.node_id, len(self._ecs))
+        # for ec in self._ecs.values():
+        #     s += "%s <----> %s\n"%(str(ec.space), str(ec.route))
+        # s += "============%s==============\n" % self.node_id
         return s
 
 
@@ -255,7 +255,7 @@ class PushPullECSMgr(BaseECSMgr):
 
         for np in r2:
             if np[0]==self.node_id:
-                log("receive a back route")
+                # log("receive a back route")
                 return None
 
         r2_n = r2[0][0]
@@ -267,7 +267,7 @@ class PushPullECSMgr(BaseECSMgr):
         if i < len(r1):
             # assert i==1, "format error" TODO:
             if i!=1:
-                log('error, i!=1')
+                # log('error, i!=1')
                 return None
             if r2[0][1] is None:
                 return r1[:i]
@@ -539,6 +539,12 @@ class FloodECSMgr(BaseECSMgr):
 
     def _route_combine(self, r1, r2):
         assert len(r1) > 0 and len(r2) > 0 and r1[0][0] != r2[0][0], "format error"
+
+        for np in r2:
+            if np[0]==self.node_id:
+                # log("receive a back route")
+                return None
+
         r2_n = r2[0][0]
         i = 1
         while i<len(r1):
