@@ -355,8 +355,8 @@ class RocketFuel(Cmd):
         # time.sleep(20)
         self.do_kill_ryu('')
         self.do_kill_ospf_and_server(None)
-        # os.system('cp -r configs ~/tmp/log-ospf-eval-dumpdata5')
-        # self.do_replay("~/tmp  10down-replay5")
+        os.system('cp -r configs ~/tmp/log-ospf-eval-dump-only5')
+        self.do_replay("~/tmp  dump-only5")
         
 
     def do_link_down_test3(self, line):
@@ -374,7 +374,7 @@ class RocketFuel(Cmd):
             spanningtree = json.load(f)
 
         links_list = list(sorted(self.topo.links.items()))
-        random.seed(0)
+        random.seed(1)
 
         downed = set()
 
@@ -394,7 +394,7 @@ class RocketFuel(Cmd):
             })
 
             self._link_down(pair)
-            for i in range(20):
+            for i in range(50):
                 print(i)
                 time.sleep(1)
 
