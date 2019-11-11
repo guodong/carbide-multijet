@@ -365,7 +365,8 @@ if __name__ == '__main__':
     parser.add_argument("dir", type=str, help="data directory")
     args = parser.parse_args()
 
-    dump_data2(args.dir, args.history, args.output, args.prefix, args.suffix)
+    # dump_data2(args.dir, args.history, args.output, args.prefix, args.suffix)
+    dump_data3(args.dir, args.output, args.prefix)
 
     # dump_data(args.dir, args.begin, args.interval)
     # dump_fpm_history(args.dir, args.begin, args.interval)

@@ -1,3 +1,5 @@
+#!/usr/bin/env python2
+
 import os
 import shutil
 import signal
@@ -38,6 +40,12 @@ class RocketFuel(Cmd):
         self.links = []
         self.containers = {}
         self.filename = filename
+        if filename.endswith(".json"):
+            self._load_json_topology(filename)
+        else:
+            self._load_cch_topology(filename)
+
+    def _load_cch_topology(self, filename):
         with open(filename, 'r') as f:
             for line in f:
                 arr = line.split()
@@ -55,6 +63,28 @@ class RocketFuel(Cmd):
                 router = self.routers[t[0]]
                 for nei in nei_ids:
                     router.neighbors.append(self.routers[nei])
+
+            for r in self.routers.values():
+                for n in r.neighbors:
+                    exists = False
+                    for l in self.links:
+                        if n in l and r in l:
+                            exists = True
+                    if not exists:
+                        self.links.append([r, n])
+
+    def _load_json_topology(self, filename):
+        with open(filename) as f:
+            switches = json.load(f)
+
+            for n in switches:
+                n = str(n)
+                self.routers[n] = Router(n)
+
+            for n,v in switches.items():
+                r = self.routers[str(n)]
+                for en in v['neighbor']:
+                    r.neighbors.append(self.routers[str(en)])
 
             for r in self.routers.values():
                 for n in r.neighbors:
@@ -178,7 +208,7 @@ class RocketFuel(Cmd):
         if os.path.exists('configs'):
             shutil.rmtree('configs')
         utils.mkdir_p('configs/common')
-        os.system('cp ignored/preset/%s/* configs/common/' % (self.filename))
+        # os.system('cp ignored/preset/%s/* configs/common/' % (self.filename))
         for r in self.routers.values():
             utils.mkdir_p('configs/' + r.id)
 
@@ -357,7 +387,6 @@ class RocketFuel(Cmd):
         self.do_kill_ospf_and_server(None)
         os.system('cp -r configs ~/tmp/log-ospf-eval-dump-only5')
         self.do_replay("~/tmp  dump-only5")
-        
 
     def do_link_down_test3(self, line):
         """link down test"""
@@ -404,7 +433,7 @@ class RocketFuel(Cmd):
             #     'op': 'up',
             #     'time': time.time()
             # })
-            
+
             # self._link_up(pair)
             # for i in range(60):
             #     print(i)
@@ -420,7 +449,6 @@ class RocketFuel(Cmd):
 
         for pair in downed:
             self._link_up(pair)
-
 
     def do_link_down_test2(self, line):
         """link down test"""
