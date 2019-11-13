@@ -71,7 +71,8 @@ class MultijetServer(ControllerBase):
         t = float(req.params['time'])
         s = float(req.params['start'])
         log("start replay at %f %f" % (t,s))
-        os.system('python /fpm/replay.py %f %f &'%(t,s))
+        # os.system('python /fpm/replay.py %f %f &'%(t,s))
+        os.system('/fpm/replay %f %f &'%(t,s))
         return 'ok'
 
 
@@ -231,7 +232,7 @@ class Multijet2(app_manager.RyuApp):
             for ip, output in data.items():
                 rules.setdefault(output, [])
                 rules[output].append(ip)
-            rules1 = [(IPSet(ip_list), output) for output, ip_list in rules.items()]
+            rules1 = [(IPSet(ip_list), output if output!=0 else None) for output, ip_list in rules.items()]
             self._qs[100].put({
                 'type': 'local_update',
                 'rules': rules1
