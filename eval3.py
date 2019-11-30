@@ -1,0 +1,582 @@
+#!/usr/bin/env python2
+
+import os
+import shutil
+import signal
+import sys
+import time
+import urllib
+import urllib2
+import re
+import json
+import argparse
+from cmd import Cmd
+import random
+
+import docker
+import grequests
+
+import utils
+
+from multijet.topo import Topology
+
+client = docker.from_env()
+
+
+class Router:
+    def __init__(self, id):
+        self.id = id
+        self.neighbors = []
+        self.port_offset = 0
+
+
+class RocketFuel(Cmd):
+    intro = 'Welcome to the Multijet eval shell.   Type help or ? to list commands.\n'
+    prompt = 'multijet> '
+
+    def __init__(self, filename='1755.r0.cch'):
+        Cmd.__init__(self)
+        self.routers = {}
+        self.links = []
+        self.containers = {}
+        self.filename = filename
+
+        self.link_status = {}
+
+        if filename.endswith(".json"):
+            self._load_json_topology(filename)
+        else:
+            self._load_cch_topology(filename)
+
+    def _load_cch_topology(self, filename):
+        with open(filename, 'r') as f:
+            for line in f:
+                arr = line.split()
+                self.routers[arr[0]] = Router(arr[0])
+
+            f.seek(0)
+
+            # generate links
+            for line in f:
+                arr = line.split('->')
+                arr = arr[1].split('=')
+                nei_str = arr[0].replace(' ', '')
+                nei_ids = nei_str[1:-1].split('><')
+                t = line.split()
+                router = self.routers[t[0]]
+                for nei in nei_ids:
+                    router.neighbors.append(self.routers[nei])
+
+            for r in self.routers.values():
+                for n in r.neighbors:
+                    exists = False
+                    for l in self.links:
+                        if n in l and r in l:
+                            exists = True
+                    if not exists:
+                        self.links.append([r, n])
+
+    def _load_json_topology(self, filename):
+        with open(filename) as f:
+            switches = json.load(f)
+
+            for n in switches:
+                n = str(n)
+                self.routers[n] = Router(n)
+
+            for n,v in switches.items():
+                r = self.routers[str(n)]
+                for en in v['neighbor']:
+                    r.neighbors.append(self.routers[str(en)])
+
+            for r in self.routers.values():
+                for n in r.neighbors:
+                    exists = False
+                    for l in self.links:
+                        if n in l and r in l:
+                            exists = True
+                    if not exists:
+                        self.links.append([r, n])
+
+    def attach(self):
+        for r in self.routers.values():
+            print 'get container ' + r.id
+            container = client.containers.get(r.id)
+            self.containers[r.id] = container
+
+        self.topo = Topology()
+        self.topo.load('configs/common/topo.json')
+
+    def start(self):
+        # generate ospf config file
+        self._make_configs_directory()
+
+        for r in self.routers.values():
+            print 'starting ' + r.id
+            container = client.containers.run('snlab/dovs-quagga', detach=True, name=r.id, privileged=True, tty=True,
+                                              hostname=r.id,
+                                              volumes={os.getcwd() + '/configs/' + r.id: {'bind': '/etc/quagga'},
+                                                       os.getcwd() + '/bootstrap': {'bind': '/bootstrap'},
+                                                       os.getcwd() + '/fpm': {'bind': '/fpm'},
+                                                       os.getcwd() + '/multijet': {'bind': '/multijet'},
+                                                       os.getcwd() + '/configs/common': {'bind': '/common'}},
+                                              command='/bootstrap/start.sh')
+            self.containers[r.id] = container
+
+        time.sleep(3)
+
+        topo = Topology()
+        topo.nodes = {r.id: {} for r in self.routers.values()}
+
+        print 'setup links'
+        i = 0
+        j = 0
+        for l in self.links:
+            srcPid = client.containers.get(l[0].id).attrs['State']['Pid']
+            dstPid = client.containers.get(l[1].id).attrs['State']['Pid']
+            cmd = 'nsenter -t ' + str(srcPid) + ' -n ip link add e' + str(
+                l[0].port_offset) + ' type veth peer name e' + str(l[1].port_offset) + ' netns ' + str(dstPid)
+            os.system(cmd)
+
+            print 'setup links for ' + str(l[0].id)
+            # set peer 1
+            utils.nsenter_run(srcPid, 'ovs-vsctl add-port s e' + str(l[0].port_offset))
+            utils.nsenter_run(srcPid, 'ovs-vsctl add-port s i' + str(l[0].port_offset) + ' -- set interface i' + str(
+                l[0].port_offset) + ' type=internal')
+
+            ip1 = '1.' + str(j) + '.' + str(i) + '.1/24'
+            utils.nsenter_run(srcPid, 'ifconfig i' + str(l[0].port_offset) + ' ' + ip1 + ' hw ether 76:00:00:00:00:01')
+            utils.nsenter_run(srcPid, 'ifconfig e' + str(l[0].port_offset) + ' 0.0.0.0')
+
+            print 'setup links for ' + str(l[1].id)
+            # set peer 2
+            utils.nsenter_run(dstPid, 'ovs-vsctl add-port s e' + str(l[1].port_offset))
+            utils.nsenter_run(dstPid,
+                              'ovs-vsctl add-port s i' + str(l[1].port_offset) + ' -- set interface i' + str(
+                                  l[1].port_offset) + ' type=internal')
+            ip2 = '1.' + str(j) + '.' + str(i) + '.2/24'
+            utils.nsenter_run(dstPid, 'ifconfig i' + str(l[1].port_offset) + ' ' + ip2 + ' hw ether 76:00:00:00:00:01')
+            utils.nsenter_run(dstPid, 'ifconfig e' + str(l[1].port_offset) + ' 0.0.0.0')
+
+            topo.nodes[l[0].id][l[0].port_offset * 2 + 1] = {'name': 'e' + str(l[0].port_offset),
+                                                             'type': 'veth', 'fip': ip1}
+            topo.nodes[l[0].id][l[0].port_offset * 2 + 2] = {'name': 'i' + str(l[0].port_offset),
+                                                             'type': 'internal', 'ip': ip1}
+            topo.nodes[l[1].id][l[1].port_offset * 2 + 1] = {'name': 'e' + str(l[1].port_offset),
+                                                             'type': 'veth', 'fip': ip2}
+            topo.nodes[l[1].id][l[1].port_offset * 2 + 2] = {'name': 'i' + str(l[1].port_offset),
+                                                             'type': 'internal', 'ip': ip2}
+            topo.links[(l[0].id, l[0].port_offset * 2 + 1)] = (l[1].id, l[1].port_offset * 2 + 1)
+            topo.links[(l[1].id, l[1].port_offset * 2 + 1)] = (l[0].id, l[0].port_offset * 2 + 1)
+
+            l[0].port_offset = l[0].port_offset + 1
+            l[1].port_offset = l[1].port_offset + 1
+
+            if i == 254:
+                j += 1
+                i = 0
+            i = i + 1
+
+        topo.save('configs/common/topo.json')
+
+        self.topo = topo
+
+        self._write_quagga_configs()
+
+        ports = topo.spanning_tree()
+        print(ports)
+        with open("configs/common/spanningtree.json", 'w') as f:
+            json.dump(ports, f, indent=2)
+
+        for id in self.routers:
+            print 'configure to_controller rules ' + id
+            c = self.containers[id]
+            cmd1 = 'ovs-ofctl add-flow -OOpenFlow13 s priority=53333,ip,ip_proto=144,actions=output:controller'
+            c.exec_run(cmd1)
+            cmd1 = 'ovs-ofctl add-flow -OOpenFlow13 s priority=53333,ip,ip_proto=143,actions=output:controller'
+            c.exec_run(cmd1)
+            ps = [str(p) for p in ports[id]]
+            ps.append('controller')
+            pss = ','.join(ps)
+            cmd2 = 'ovs-ofctl add-flow -OOpenFlow13 s priority=53333,ip,ip_proto=145,actions=output:%s' % pss
+            c.exec_run(cmd2)
+
+        # configure ospf rules
+        for id in self.routers:
+            print 'configure ospf rule of ' + id
+            c = self.containers[id]
+            c.exec_run('/bootstrap/start.py', detach=True)
+
+    def _make_configs_directory(self):
+        if os.path.exists('configs'):
+            shutil.rmtree('configs')
+        utils.mkdir_p('configs/common')
+        # os.system('cp ignored/preset/%s/* configs/common/' % (self.filename))
+        for r in self.routers.values():
+            utils.mkdir_p('configs/' + r.id)
+
+    def _write_quagga_configs(self):
+        for node_id, ports in self.topo.nodes.items():
+            print('write quagga configs', node_id)
+            with open('configs/' + node_id + '/zebra.conf', 'w') as f:
+                f.write('hostname Router\npassword zebra\nenable password zebra')
+
+            with open('configs/' + node_id + '/ospfd.conf', 'w') as f:
+                f.write('hostname ospfd\npassword zebra\nlog stdout\n')
+
+                # for port_id, port in ports.items():
+                #     if port['type'] == 'internal':
+                #         f.write(
+                #             '!\ninterface %s\n  ip ospf hello-interval 4\n  ip ospf dead-interval 10\n' % port['name'])
+
+                f.write('!\nrouter ospf\n')
+
+                for port_id, port in ports.items():
+                    if port['type'] == 'internal':
+                        f.write(' network ' + port['ip'] + ' area 0\n')
+
+    def node_nsenter_exec(self, n, cmd):
+        pid = client.containers.get(n).attrs['State']['Pid']
+        utils.nsenter_run(pid, cmd)
+
+    def stop(self):
+        print 'cleaning containers...'
+
+        for name in self.containers:
+            print("clean container %s" % name)
+            client.containers.get(name).remove(force=True)
+
+        exit(0)
+
+    def emptyline(self):
+        return ""
+
+    def do_write_quagga_configs(self, line):
+        self._write_quagga_configs()
+
+    def do_start_ospf(self, line):
+        """ start ospf process"""
+        for r in self.routers.values():
+            print 'start ospf for ' + r.id
+            c = self.containers[r.id]
+            c.exec_run('zebra -d -f /etc/quagga/zebra.conf --fpm_format protobuf')
+            c.exec_run('ospfd -d -f /etc/quagga/ospfd.conf')
+
+    def do_start_fpm_server(self, line):
+        """ start fpm server process"""
+        for r in self.routers.values():
+            print 'start fpm for ' + r.id
+            c = self.containers[r.id]
+            c.exec_run('python /fpm/main.py &', detach=True)
+
+    def do_kill_ospf_and_server(self, line):
+        """ kill ospf and fpm server process"""
+        os.system('pkill -f -e "^python /fpm/main.py"')
+        os.system('pkill -f -e "^zebra"')
+        os.system('pkill -f -e "^ospfd"')
+
+    def do_start_ospf_and_server(self, line):
+        """ start ospf and fpm server prcocess"""
+        os.system("rm -f configs/common/fpm-history-*.json")
+        os.system("rm -f configs/common/fpm-server-*.log")
+        self.do_start_fpm_server(None)
+        self.do_start_ospf(None)
+
+    def do_start_ospf_and_server_async(self, line):
+        """ start fpm server and start ospf asynchronously"""
+        os.system("rm -f configs/common/fpm-history-*.json")
+        os.system("rm -f configs/common/fpm-server-*.log")
+        self.do_start_fpm_server(None)
+        # self.do_start_ospf(None)
+        urls = []
+        for c in self.containers:
+            ip = str(client.containers.get(c).attrs['NetworkSettings']['Networks']['bridge']['IPAddress'])
+            urls.append('http://' + ip + ':8080/startospf')
+        rs = (grequests.get(u) for u in urls)
+        resps = grequests.map(rs)
+        print(resps)
+
+    def do_link_down_test(self, line):
+        """link down test"""
+        args = line.split()
+        if len(args) < 1:
+            print('link_down_test file.name')
+            return
+
+        history_file_name = args[0]
+
+        history = []
+
+        with open('configs/common/spanningtree.json') as f:
+            spanningtree = json.load(f)
+
+        links_list = list(sorted(self.topo.links.items()))
+        random.seed(0)
+
+        for index in range(10):
+
+            while True:
+                ri = random.randint(0, len(links_list) - 1)
+                pair = links_list[ri]
+                s,e  = pair
+                if s[1] in spanningtree[s[0]] and e[1] in spanningtree[e[0]]:
+                    print("avoid spanningtree link")
+                else:
+                    print(s, e)
+                    break
+
+            history.append({
+                'pair': pair,
+                'op': 'down',
+                'time': time.time()
+            })
+
+            self._link_down(pair)
+            for i in range(60):
+                print(i)
+                time.sleep(1)
+
+            history.append({
+                'pair': pair,
+                'op': 'up',
+                'time': time.time()
+            })
+
+            self._link_up(pair)
+            for i in range(120):
+                print(i)
+                time.sleep(1)
+
+        with open(history_file_name, 'w') as f:
+            json.dump(history, f, indent=2)
+
+    def do_link(self, line):
+        """link down/up  host1 host2"""
+        args = line.split()
+        if len(args) < 3:
+            print("error args")
+            return
+        op, n1, n2 = args[0], args[1], args[2]
+        if n1 not in self.topo.nodes or n2 not in self.topo.nodes:
+            print("error args")
+            return
+        for start, end in self.topo.links.items():
+            if start[0] == n1 and end[0] == n2:
+                if op == 'down':
+                    self._link_down((start, end))
+                elif op == 'up':
+                    self._link_up((start, end))
+                break
+        else:
+            print("not find link")
+
+    def _link_down(self, pair):  # ((n1, p1), (n2, p2))
+        for n, p in pair:
+            ename = self.topo.nodes[n][p]['name']
+            iname = 'i' + ename[1:]
+            self.node_nsenter_exec(n, "ifconfig %s down" % iname)
+            print('down', n, iname)
+
+    def _link_up(self, pair):  # ((n1, p1), (n2, p2))
+        for n, p in pair:
+            ename = self.topo.nodes[n][p]['name']
+            iname = 'i' + ename[1:]
+            self.node_nsenter_exec(n, "ifconfig %s up" % iname)
+            print('up', n, iname)
+
+    def do_set_bw_latency(self, line):
+        """set_bw_latency n1 n2 bw(kbps) latency(ms)"""
+        args = line.split()
+        if len(args) < 4:
+            print("error args")
+            return
+        n1, n2, bw, latency = args[0], args[1], args[2], args[3]
+        bw = int(bw)
+        latency = int(latency)
+        if n1 not in self.topo.nodes or n2 not in self.topo.nodes:
+            print("error args")
+            return
+        for start, end in self.topo.links.items():
+            if start[0] == n1 and end[0] == n2:
+                self._link_set_bw_latency((start, end), bw, latency)
+                break
+        else:
+            print("not find link")
+
+    def _link_set_bw_latency(self, pair, bw, latency):  # ((n1, p1), (n2, p2))
+        for n, p in pair:
+            name = self.topo.nodes[n][p]['name']
+            status = self.link_status.setdefault((n, p), {})
+            pre_bw = status.setdefault('bw', None)
+            pre_latency = status.setdefault('latency', None)
+            cmds = []
+            if pre_bw is None and pre_latency is None:
+                cmds.append('tc qdisc del dev e0 root')
+                cmds.append('tc qdisc add dev e0 root handle 5:0 htb default 1')
+            if pre_bw != bw:
+                if bw is None:
+                    cmds.append('tc class del dev %s parent 5:0 classid 5:1' % (name, ))
+                elif pre_bw is None:
+                    cmds.append('tc class add dev %s parent 5:0 classid 5:1 htb rate %dkbit burst 4k' % (name, bw))
+                else:
+                    cmds.append('tc class change dev %s parent 5:0 classid 5:1 htb rate %dkbit burst 4k' % (name, bw))
+            if pre_latency != latency:
+                if latency is None:
+                    cmds.append('tc qdisc del dev %s parent 5:1 handle 10:' % (name,))
+                elif pre_latency is None:
+                    cmds.append('tc qdisc add dev %s parent 5:1 handle 10: netem delay %dms' % (name, latency))
+                else:
+                    cmds.append('tc qdisc change dev %s parent 5:1 handle 10: netem delay %dms' % (name, latency))
+            status['bw'] = bw
+            status['latency'] = latency
+            for cmd in cmds:
+                self.node_nsenter_exec(n, cmd)
+
+    def do_start_ryu(self, line):
+        """deprecated"""
+        for r in self.routers.values():
+            print 'start multijet for ' + r.id
+            c = self.containers[r.id]
+            c.exec_run('ryu-manager /multijet/multijet.py', detach=True)
+
+    def do_start_ryu2(self, line):
+        """start multijet main process"""
+        self.do_remove_log(None)
+
+        for r in self.routers.values():
+            print 'start multijet2 for ' + r.id
+            c = self.containers[r.id]
+            code, output = c.exec_run('ryu-manager multijet.multijet2', detach=True, environment=['PYTHONPATH=/'],
+                                      workdir='/')
+            print(output)
+
+    def do_remove_log(self, line):
+        """remove multijet log file"""
+        for n in self.routers:
+            log_file_path = 'configs/%s/multijet2.log' % n
+            if os.path.exists(log_file_path):
+                os.remove(log_file_path)
+
+    def do_kill_ryu(self, line):
+        """kill all ryu process"""
+        os.system('pkill -f -e "^/usr/bin/python /usr/local/bin/ryu-manager"')
+        # for r in self.routers.values():
+        #     print 'kill multijet2 for ' + r.id
+        #     c = self.containers[r.id]
+        #     code, output = c.exec_run('pkill ryu')
+        #     print(output)
+
+    def do_ps(self, line):
+        for r in self.routers.values():
+            print 'ps cmd for ' + r.id
+            c = self.containers[r.id]
+            code, output = c.exec_run('ps')
+            print(output)
+
+    def do_exec(self, line):
+        for r in self.routers.values():
+            print('exec cmd %s for %s' % (line, str(r.id)))
+            c = self.containers[r.id]
+            code, output = c.exec_run(line)
+            print(output)
+
+    def do_test(self, line):
+        print(line)
+        urls = []
+        for c in self.containers:
+            ip = str(client.containers.get(c).attrs['NetworkSettings']['Networks']['bridge']['IPAddress'])
+            urls.append('http://' + ip + ':8080/test')
+        rs = (grequests.get(u) for u in urls)
+        resps = grequests.map(rs)
+        print(resps)
+
+    def do_restart(self, line):
+        print(line)
+        urls = []
+        for c in self.containers:
+            ip = str(client.containers.get(c).attrs['NetworkSettings']['Networks']['bridge']['IPAddress'])
+            urls.append('http://' + ip + ':8080/restart')
+        rs = (grequests.get(u) for u in urls)
+        resps = grequests.map(rs)
+        print(resps)
+
+    def do_test_ready(self, line):
+        for n in self.routers:
+            with open('configs/%s/multijet2.log' % n) as f:
+                s = f.read()
+                # print(s)
+                if 'start run' not in s:
+                    print('node %s not ready' % n)
+        print('test ready done!')
+
+    def _read_config_path(self, i):
+        with open('configs/common/random_path.json') as f:
+            data = json.load(f)
+        return [(str(n), int(output)) for n, output in data[i]]
+
+    def _get_config_path_length(self):
+        with open('configs/common/random_path.json') as f:
+            data = json.load(f)
+        return len(data)
+
+    def do_dump_random_path(self, line):
+        """random generate test path and write configuration file"""
+        paths = []
+        try:
+            num, a, b = line.split()
+            num = int(num)
+            start = int(a)
+            end = int(b)
+        except:
+            print('error argument')
+            return
+
+        while len(paths) < num:
+            select_len = random.randint(start, end)
+            nodes = list(self.topo.nodes.keys())
+            r1 = random.randint(0, len(nodes) - 1)
+            sn = nodes[r1]
+            path = []
+            flags = {n: False for n in nodes}
+            print('select_len', select_len)
+            while len(path) < select_len:
+                flags[sn] = True
+                nsn = [(p1, p2[0]) for p1, p2 in self.topo.links.items() if p1[0] == sn and flags[p2[0]] == False]
+                if len(nsn) == 0:
+                    break
+                r2 = random.randint(0, len(nsn) - 1)
+                ns = nsn[r2]
+                path.append(ns[0])
+                sn = ns[1]
+            print('path', path)
+
+            if len(path) >= start:
+                paths.append(path)
+            print('len(paths)', len(paths))
+        with open('configs/common/random_path.json', 'w') as f:
+            json.dump(paths, f, indent=2)
+
+    def do_exit(self, line):
+        """exit all container"""
+        print('shell exit')
+        return True
+
+    def do_just_exit(self, line):
+        """just exit this shell, but keep container running"""
+        print('just exit')
+        exit(0)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="eval2")
+    parser.add_argument("-v", "--verbose", action="store_true")
+    parser.add_argument("-a", "--attach", action="store_true")
+    parser.add_argument("topo", type=str, help="topology file")
+    args = parser.parse_args()
+    topo = RocketFuel(args.topo)
+    if args.attach:
+        topo.attach()
+    else:
+        topo.start()
+    topo.cmdloop()
+    topo.stop()
