@@ -70,25 +70,14 @@ def add_flow(dst, output):
     actions = 'output:' + output
     cmd = 'ovs-ofctl add-flow s table=100,ip,nw_dst=' + dst + ',actions=' + actions
     logger.info('add-flow dst=%s output=%s' % (str(dst), str(output)))
-    # history_list_append_and_dump({
-    #     'type': 'add-flow',
-    #     'time': time.time(),
-    #     'dst': str(dst),
-    #     'output': str(output)
-    # })
-    # os.system(cmd)
+    os.system(cmd)
     global_new_flows[dst] = int(output)
 
 
 def delete_flow(dst):
     logger.info('delete route %s' % dst)
     cmd = 'ovs-ofctl del-flow s table=100,ip,nw_dst=' + dst
-    # os.system(cmd)
-    # history_list_append_and_dump({
-    #     'type': 'delete-flow',
-    #     'time': time.time(),
-    #     'dst': str(dst)
-    # })
+    os.system(cmd)
     if dst in global_flows:
         global_new_flows[dst] = None
 
@@ -160,11 +149,11 @@ def main():
                 else:
                     logger.info('UNKNOWN message type')
 
-                time.sleep(0.000001)
-                fcntl.ioctl(conn, termios.FIONREAD, sock_size_buf)
-                if sock_size_buf[0] == 0:
-                    logger.info('empty sock read')
-                    request_update()
+                # time.sleep(0.000001)
+                # fcntl.ioctl(conn, termios.FIONREAD, sock_size_buf)
+                # if sock_size_buf[0] == 0:
+                #     logger.info('empty sock read')
+                #     request_update()
 
             except (SystemExit, KeyboardInterrupt):
                 raise

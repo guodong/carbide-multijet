@@ -282,19 +282,11 @@ class RocketFuel(Cmd):
         self.do_start_fpm_server(None)
         self.do_start_ospf(None)
 
-    def do_start_ospf_and_server_async(self, line):
-        """ start fpm server and start ospf asynchronously"""
-        os.system("rm -f configs/common/fpm-history-*.json")
-        os.system("rm -f configs/common/fpm-server-*.log")
-        self.do_start_fpm_server(None)
-        # self.do_start_ospf(None)
-        urls = []
-        for c in self.containers:
-            ip = str(client.containers.get(c).attrs['NetworkSettings']['Networks']['bridge']['IPAddress'])
-            urls.append('http://' + ip + ':8080/startospf')
-        rs = (grequests.get(u) for u in urls)
-        resps = grequests.map(rs)
-        print(resps)
+    def do_eval(self, line):
+        for l in self.topo.links.items():
+            self._link_set_bw_latency(l, 128, 1)
+        time.sleep(3)
+        self.do_link_down_test('configs/common/link_down_test.log')
 
     def do_link_down_test(self, line):
         """link down test"""
@@ -304,48 +296,31 @@ class RocketFuel(Cmd):
             return
 
         history_file_name = args[0]
-
         history = []
-
-        with open('configs/common/spanningtree.json') as f:
-            spanningtree = json.load(f)
-
         links_list = list(sorted(self.topo.links.items()))
         random.seed(0)
 
         for index in range(10):
-
-            while True:
-                ri = random.randint(0, len(links_list) - 1)
-                pair = links_list[ri]
-                s,e  = pair
-                if s[1] in spanningtree[s[0]] and e[1] in spanningtree[e[0]]:
-                    print("avoid spanningtree link")
-                else:
-                    print(s, e)
-                    break
+            ri = random.randint(0, len(links_list) - 1)
+            pair = links_list[ri]
 
             history.append({
                 'pair': pair,
                 'op': 'down',
                 'time': time.time()
             })
-
             self._link_down(pair)
-            for i in range(60):
-                print(i)
-                time.sleep(1)
+            time.sleep(1)
+            print('link', pair, 'down')
 
             history.append({
                 'pair': pair,
                 'op': 'up',
                 'time': time.time()
             })
-
             self._link_up(pair)
-            for i in range(120):
-                print(i)
-                time.sleep(1)
+            time.sleep(1)
+            print('link', pair, 'up')
 
         with open(history_file_name, 'w') as f:
             json.dump(history, f, indent=2)
@@ -411,8 +386,8 @@ class RocketFuel(Cmd):
             pre_latency = status.setdefault('latency', None)
             cmds = []
             if pre_bw is None and pre_latency is None:
-                cmds.append('tc qdisc del dev e0 root')
-                cmds.append('tc qdisc add dev e0 root handle 5:0 htb default 1')
+                # cmds.append('tc qdisc del dev %s root'  % (name, ))
+                cmds.append('tc qdisc add dev %s root handle 5:0 htb default 1'  % (name, ))
             if pre_bw != bw:
                 if bw is None:
                     cmds.append('tc class del dev %s parent 5:0 classid 5:1' % (name, ))
@@ -430,6 +405,7 @@ class RocketFuel(Cmd):
             status['bw'] = bw
             status['latency'] = latency
             for cmd in cmds:
+                print(n, cmd)
                 self.node_nsenter_exec(n, cmd)
 
     def do_start_ryu(self, line):

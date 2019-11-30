@@ -1,5 +1,19 @@
 # Multijet Evaluation
 
+## eval
+
+```
+sudo python eval3.py test.cch
+
+> start_ospf_and_server
+
+> eval
+
+```
+
+
+
+
 ## Quick Start
 
 1. start evaluation shell
