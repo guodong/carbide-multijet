@@ -30,7 +30,7 @@ set term post size 12,9
 set xlabel 'Time(s)'
 set ylabel 'Node'
 # set style line 2 lc rgb 'red' pt 1
-# set xrange [200:201]
+set xrange [350:352]
 set output "${output}"
 plot "${line_data}" with lines, "${point_data}" with points pt 13
 """
@@ -55,13 +55,14 @@ def main():
     #         data_file="/home/yutao/tmp/output-log-ospf-eval-dump-only6/dump-only-update-point.dat")
 
     method = 'flood'
-    suffix = 'dump-only7'
+    suffix = 'dump-only-deltacom'
     gnuplot(line_points_template, output="./gnuplot/figures/tmp-%s-%s.eps" % (method, suffix),
             point_data="/home/yutao/tmp/output-log-replay-%s-%s/replay-%s-update-point.dat" % (method, suffix, method),
             line_data="/home/yutao/tmp/output-log-replay-%s-%s/replay-%s-multijet-log.dat" % (method, suffix, method))
+    # gnuplot(points_template, output="./gnuplot/figures/tmp-ospf-%s.eps" % (suffix),
+    #          data_file="/home/yutao/tmp/output-log-ospf-eval-%s/dump-only-update-point.dat" % suffix)
 
-
-def load_data(log_path, fpm_history_path, interval = 60, groups = 100):
+def load_data(log_path, fpm_history_path, interval = 60, groups = 100, start_point = 200):
     with open(log_path) as f:
         log = json.load(f)
 
@@ -73,7 +74,7 @@ def load_data(log_path, fpm_history_path, interval = 60, groups = 100):
 
     bar1 = []
     bar2 = []
-    for i in range(195, 195+interval * groups, interval):
+    for i in range(start_point - 2, start_point -2 + interval * groups, interval):
         left = i
         right = i+ 10
 
@@ -104,7 +105,7 @@ def load_data(log_path, fpm_history_path, interval = 60, groups = 100):
                 e-=log_mn
                 if left<s<right and s<mn:
                     mn = s
-                if left<e<right and e>mx:
+                if left<e<right and e>mx and c:
                     mx = e
         print(mx, mn)
         bar1.append(mx-mn)
@@ -118,16 +119,22 @@ OUTPUT = "ignored/figures2/"
 
 
 def main2():
-    method = 'flood'
-    suffix = 'dump-only7'
+    method = 'pp'
+    suffix = 'dump-only-172'
 
     log_path = "/home/yutao/tmp/output-log-replay-%s-%s/replay-%s-multijet-log.json" % (method, suffix, method)
     fpm_history_path = "/home/yutao/tmp/output-log-replay-%s-%s/replay-%s-fpm_history.json" % (method, suffix, method)
 
-    bar1, bar2 = load_data(log_path, fpm_history_path)
+    bar1, bar2 = load_data(log_path, fpm_history_path, interval=150, groups=20, start_point=200)
 
     bar1 = list(a if a is not None else 0 for a in bar1)
     bar2 = list(a if a is not None else 0 for a in bar2)
+
+    # bar1 = list(a for a in bar1 if a is not None)
+    # bar2 = list(a for a in bar2 if a is not None)
+
+    # bar1 = bar1[1:]
+    # bar2 = bar2[1:]
 
     x = list(range(1,1 + len(bar1)))
 
@@ -137,10 +144,12 @@ def main2():
         plt.title("Carbide wtih flood method")
     plt.bar(x, bar1, label='Carbide')
     plt.bar(x, bar2, label='OSPF')
+    plt.xticks(x, [str(i) for i in x])
     plt.ylabel("time(s)")
     plt.legend()
     # plt.show()
     plt.savefig(OUTPUT + 'result-%s-%s.png' % (method, suffix), bbox_inches='tight')
+
 
 def gnuplot(template, **kwargs):
     os.environ['PATH'] += ":/home/yutao/App/gnuplot/bin"

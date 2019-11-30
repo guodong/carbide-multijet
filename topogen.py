@@ -17,7 +17,7 @@ def main():
     outputfile = args.output
     topo = nx.read_graphml(args.source).to_undirected()
 
-    index = 10
+    index = 100
     labels = {}
     for n in topo.adj:
         labels[n] = str(index)
@@ -35,8 +35,8 @@ def main():
 
     links = set()
     for link, attr in topo.edges.items():
-        id = attr['id']
-        print(id)
+        # id = attr['id']
+        print(attr)
         pair = labels[link[0]], labels[link[1]]
         # assert pair not in links
         links.add(pair)

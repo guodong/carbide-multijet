@@ -71,8 +71,8 @@ class MultijetServer(ControllerBase):
         t = float(req.params['time'])
         s = float(req.params['start'])
         log("start replay at %f %f" % (t,s))
-        # os.system('python /fpm/replay.py %f %f &'%(t,s))
-        os.system('/fpm/replay %f %f &'%(t,s))
+        os.system('python /fpm/replay.py %f %f &'%(t,s))
+        # os.system('/fpm/replay %f %f &'%(t,s))
         return 'ok'
 
 
