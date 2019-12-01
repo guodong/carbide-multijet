@@ -6,16 +6,17 @@ import json
 
 
 def gen_topo(n):
-    G = nx.gnp_random_graph(n, 0.12, 1)
+    G = nx.fast_gnp_random_graph(n, 0.132, 1)
     nx.draw(G, with_labels=True)
+    plt.savefig("gentopo.out.png")
     plt.show()
     result = {}
 
     for i in range(n):
-        result[str(i)] = {'neighbor': []}
+        result[str(i + 1)] = {'neighbor': []}
     for e in G.edges:
-        result[str(e[0])]['neighbor'].append(str(e[1]))
-        result[str(e[1])]['neighbor'].append(str(e[0]))
+        result[str(e[0] + 1)]['neighbor'].append(str(e[1] + 1))
+        result[str(e[1] + 1)]['neighbor'].append(str(e[0] + 1))
 
     print result
     with open('gentopo.out.json', 'w') as f:
