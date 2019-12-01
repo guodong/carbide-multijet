@@ -485,6 +485,20 @@ class RocketFuel(Cmd):
                     print('node %s not ready' % n)
         print('test ready done!')
 
+    def do_dump_netstat_ns_config(self, line):
+        lines = []
+        for n, ports in self.topo.nodes.items():
+            pid = client.containers.get(n).attrs['State']['Pid']
+            names = []
+            for p in ports.values():
+                if p['type'] == 'veth':
+                    names.append(p['name'])
+            lines.append("%d %d %s\n" % (pid, len(names), ' '.join(names)))
+        with open('configs/common/netstat_ns.conf', 'w') as f:
+            for l in lines:
+                f.write(l)
+        print(lines)
+
     def _read_config_path(self, i):
         with open('configs/common/random_path.json') as f:
             data = json.load(f)
