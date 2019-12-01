@@ -13,10 +13,10 @@ def gen_topo(n):
     result = {}
 
     for i in range(n):
-        result[str(i + 1)] = {'neighbor': []}
+        result[str(i) + '1'] = {'neighbor': []}
     for e in G.edges:
-        result[str(e[0] + 1)]['neighbor'].append(str(e[1] + 1))
-        result[str(e[1] + 1)]['neighbor'].append(str(e[0] + 1))
+        result[str(e[0]) + '1']['neighbor'].append(str(e[1]) + '1')
+        result[str(e[1]) + '1']['neighbor'].append(str(e[0]) + '1')
 
     print result
     with open('gentopo.out.json', 'w') as f:
