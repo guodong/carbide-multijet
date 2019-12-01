@@ -41,7 +41,7 @@ class RocketFuel(Cmd):
         self.containers = {}
         self.filename = filename
 
-        self.link_status = {}
+        self.port_status = {}
 
         if filename.endswith(".json"):
             self._load_json_topology(filename)
@@ -282,11 +282,29 @@ class RocketFuel(Cmd):
         self.do_start_fpm_server(None)
         self.do_start_ospf(None)
 
+    def do_setup_ovs_controller(self, line):
+        args = line.split()
+        controller_addr = 'tcp:127.0.0.1:6633'
+        if len(args)<1:
+            print("default controller address", controller_addr)
+        else:
+            controller_addr = args[0]
+        
+        for n,c in self.containers.items():
+            cmd = "ovs-vsctl set-controller s %s" % controller_addr
+            print(cmd)
+            c.exec_run(cmd)
+
     def do_eval(self, line):
+        print("TODO")
+
+    def do_setup_latency(self, line):
         for l in self.topo.links.items():
-            self._link_set_bw_latency(l, 128, 1)
-        time.sleep(3)
-        self.do_link_down_test('configs/common/link_down_test.log')
+            self._link_set_bw_latency(l, 64, None)
+        for n in self.topo.nodes:
+            self._port_set_bw_latency(n, 'eth0', 64, None)
+        # time.sleep(3)
+        # self.do_link_down_test('configs/common/link_down_test.log')
 
     def do_link_down_test(self, line):
         """link down test"""
@@ -381,32 +399,35 @@ class RocketFuel(Cmd):
     def _link_set_bw_latency(self, pair, bw, latency):  # ((n1, p1), (n2, p2))
         for n, p in pair:
             name = self.topo.nodes[n][p]['name']
-            status = self.link_status.setdefault((n, p), {})
+            self._port_set_bw_latency(n, name, bw, latency)
+        
+    def _port_set_bw_latency(self, node, port_name, bw, latency): #  '11' 'e0'
+            status = self.port_status.setdefault((node, port_name), {})
             pre_bw = status.setdefault('bw', None)
             pre_latency = status.setdefault('latency', None)
             cmds = []
             if pre_bw is None and pre_latency is None:
-                # cmds.append('tc qdisc del dev %s root'  % (name, ))
-                cmds.append('tc qdisc add dev %s root handle 5:0 htb default 1'  % (name, ))
+                cmds.append('tc qdisc del dev %s root'  % (port_name, ))
+                cmds.append('tc qdisc add dev %s root handle 5:0 htb default 1'  % (port_name, ))
             if pre_bw != bw:
                 if bw is None:
-                    cmds.append('tc class del dev %s parent 5:0 classid 5:1' % (name, ))
+                    cmds.append('tc class del dev %s parent 5:0 classid 5:1' % (port_name, ))
                 elif pre_bw is None:
-                    cmds.append('tc class add dev %s parent 5:0 classid 5:1 htb rate %dkbit burst 4k' % (name, bw))
+                    cmds.append('tc class add dev %s parent 5:0 classid 5:1 htb rate %dkbit burst 4k' % (port_name, bw))
                 else:
-                    cmds.append('tc class change dev %s parent 5:0 classid 5:1 htb rate %dkbit burst 4k' % (name, bw))
+                    cmds.append('tc class change dev %s parent 5:0 classid 5:1 htb rate %dkbit burst 4k' % (port_name, bw))
             if pre_latency != latency:
                 if latency is None:
-                    cmds.append('tc qdisc del dev %s parent 5:1 handle 10:' % (name,))
+                    cmds.append('tc qdisc del dev %s parent 5:1 handle 10:' % (port_name,))
                 elif pre_latency is None:
-                    cmds.append('tc qdisc add dev %s parent 5:1 handle 10: netem delay %dms' % (name, latency))
+                    cmds.append('tc qdisc add dev %s parent 5:1 handle 10: netem delay %dms' % (port_name, latency))
                 else:
-                    cmds.append('tc qdisc change dev %s parent 5:1 handle 10: netem delay %dms' % (name, latency))
+                    cmds.append('tc qdisc change dev %s parent 5:1 handle 10: netem delay %dms' % (port_name, latency))
             status['bw'] = bw
             status['latency'] = latency
             for cmd in cmds:
-                print(n, cmd)
-                self.node_nsenter_exec(n, cmd)
+                print(node, cmd)
+                self.node_nsenter_exec(node, cmd)
 
     def do_start_ryu(self, line):
         """deprecated"""
