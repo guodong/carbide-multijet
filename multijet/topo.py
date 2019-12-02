@@ -4,7 +4,7 @@ import json
 class Topology:
     def __init__(self):
         self.nodes = {} # id : {port_num:  {'name': ' ',  }}
-        self.links = {}
+        self.links = {} # {p1: p2}
 
     def load(self, path):
         with open(path) as f:
@@ -84,3 +84,75 @@ class Topology:
                 spanning_tree_ports[mn[0][0]].append(mn[0][1])
                 spanning_tree_ports[mn[1][0]].append(mn[1][1])
         return spanning_tree_ports
+
+
+def shortest_tree(topo, target_link_pair, TARGET='target'):
+    import networkx as nx
+    g = nx.Graph()
+    for n in topo.nodes:
+        g.add_node(n)
+    g.add_node(TARGET)
+    ports = set()
+    for p1, p2 in topo.links.items():
+        if p1 not in ports:
+            if p1 in target_link_pair:
+                g.add_edge(p1[0], TARGET)
+                g.add_edge(p2[0], TARGET)
+            else:
+                g.add_edge(p1[0], p2[0])
+            ports.add(p1)
+            ports.add(p2)
+    paths = nx.single_target_shortest_path(g, TARGET)
+    return paths
+
+
+def shortest_path_fwd_rules(topo):
+    node_pair_to_port = {}
+    for p1, p2 in topo.links.items():
+        node_pair_to_port[(p1[0], p2[0])] = p1
+
+    network_to_fwds = {}
+
+    ports = set()
+    for p1, p2 in topo.links.items():
+        if p1 not in ports:
+            ports.add(p1)
+            ports.add(p2)
+            fwds = {}
+            target = 'target'
+            nptp2 = dict(node_pair_to_port)
+            nptp2[(p1[0], target)] = p1
+            nptp2[(p2[0], target)] = p2
+            paths = shortest_tree(topo, (p1, p2), target)
+            for start, path in paths.items():
+                ll = len(path)
+                if ll>1:
+                    for i in range(ll-1):
+                        n1 = path[i]
+                        n2 = path[i+1]
+                        fwds[n1] = nptp2[(n1, n2)]
+            # print(fwds)
+            net = topo.nodes[p1[0]][p1[1]]['net']
+            network_to_fwds[net] = fwds
+
+    # print(network_to_fwds)
+    return network_to_fwds
+
+
+def topo_port_set_network(topo):
+    from netaddr import IPNetwork
+    for n, ports in topo.nodes.items():
+        for port_no, attrs in ports.items():
+            ip = attrs.get('ip', None) or attrs.get('fip', None)
+            if ip:
+                net = IPNetwork(ip)
+                netmask = str(net.netmask)
+                network = str(net.network)
+                attrs['net'] = (network, netmask)
+
+
+if __name__=="__main__":
+    topo = Topology()
+    topo.load('configs/common/topo.json')
+    topo_port_set_network(topo)
+    shortest_path_fwd_rules(topo)

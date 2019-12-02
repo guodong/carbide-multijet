@@ -123,9 +123,12 @@ class RocketFuel(Cmd):
                                                        os.getcwd() + '/multijet': {'bind': '/multijet'},
                                                        os.getcwd() + '/configs/common': {'bind': '/common'}},
                                               command='/bootstrap/start.sh')
-            self.containers[r.id] = container
 
         time.sleep(3)
+
+        for r in self.routers.values():
+            container = client.containers.get(r.id)
+            self.containers[r.id] = container
 
         topo = Topology()
         topo.nodes = {r.id: {} for r in self.routers.values()}
@@ -189,6 +192,14 @@ class RocketFuel(Cmd):
         print(ports)
         with open("configs/common/spanningtree.json", 'w') as f:
             json.dump(ports, f, indent=2)
+
+        container_info = {}
+        for n,c in self.containers.items():
+            ipaddr = c.attrs['NetworkSettings']['IPAddress']
+            container_info[n] = {'eth0': ipaddr}
+        print(container_info)
+        with open("configs/common/container.json", 'w') as f:
+            json.dump(container_info, f)
 
         for id in self.routers:
             print 'configure to_controller rules ' + id
@@ -291,6 +302,8 @@ class RocketFuel(Cmd):
             print("default controller address", controller_addr)
         else:
             controller_addr = args[0]
+            if controller_addr == 'external':
+                controller_addr = 'tcp:172.17.0.1:6653'
         
         for n,c in self.containers.items():
             cmd = "ovs-vsctl set-controller s %s" % controller_addr
@@ -304,7 +317,7 @@ class RocketFuel(Cmd):
         for l in self.topo.links.items():
             self._link_set_bw_latency(l, 64, None)
         for n in self.topo.nodes:
-            self._port_set_bw_latency(n, 'eth0', 16, None)
+            self._port_set_bw_latency(n, 'eth0', 64, None)
         # time.sleep(3)
         # self.do_link_down_test('configs/common/link_down_test.log')
 
