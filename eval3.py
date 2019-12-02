@@ -19,6 +19,7 @@ import grequests
 import utils
 
 from multijet.topo import Topology
+from scripts.dumpdata import get_fpm_history, get_nodes
 
 client = docker.from_env()
 
@@ -36,6 +37,7 @@ class RocketFuel(Cmd):
 
     def __init__(self, filename='1755.r0.cch'):
         Cmd.__init__(self)
+        self.current = time.time()
         self.routers = {}
         self.links = []
         self.containers = {}
@@ -302,12 +304,13 @@ class RocketFuel(Cmd):
         for l in self.topo.links.items():
             self._link_set_bw_latency(l, 64, None)
         for n in self.topo.nodes:
-            self._port_set_bw_latency(n, 'eth0', 64, None)
+            self._port_set_bw_latency(n, 'eth0', 16, None)
         # time.sleep(3)
         # self.do_link_down_test('configs/common/link_down_test.log')
 
     def do_link_down_test(self, line):
         """link down test"""
+        self.current = time.time()
         args = line.split()
         if len(args) < 1:
             print('link_down_test file.name')
@@ -317,8 +320,10 @@ class RocketFuel(Cmd):
         history = []
         links_list = list(sorted(self.topo.links.items()))
         random.seed(0)
+        total_time = int(args[1]) # second
+        frequency = float(args[2]) # HZ
 
-        for index in range(10):
+        for index in range(int(total_time * frequency / 2)):
             ri = random.randint(0, len(links_list) - 1)
             pair = links_list[ri]
 
@@ -328,7 +333,7 @@ class RocketFuel(Cmd):
                 'time': time.time()
             })
             self._link_down(pair)
-            time.sleep(1)
+            time.sleep((1.0/frequency))
             print('link', pair, 'down')
 
             history.append({
@@ -337,11 +342,18 @@ class RocketFuel(Cmd):
                 'time': time.time()
             })
             self._link_up(pair)
-            time.sleep(1)
+            time.sleep((1.0/frequency))
             print('link', pair, 'up')
 
         with open(history_file_name, 'w') as f:
             json.dump(history, f, indent=2)
+
+
+    def do_gather_update_time(self, line):
+        nodes = get_nodes('configs')
+        history = get_fpm_history(nodes)
+        for id, time_list in history.items():
+            print id, time_list[-1] - self.current
 
     def do_link(self, line):
         """link down/up  host1 host2"""
@@ -354,6 +366,7 @@ class RocketFuel(Cmd):
             print("error args")
             return
         for start, end in self.topo.links.items():
+            self.current = time.time()
             if start[0] == n1 and end[0] == n2:
                 if op == 'down':
                     self._link_down((start, end))
@@ -413,9 +426,9 @@ class RocketFuel(Cmd):
                 if bw is None:
                     cmds.append('tc class del dev %s parent 5:0 classid 5:1' % (port_name, ))
                 elif pre_bw is None:
-                    cmds.append('tc class add dev %s parent 5:0 classid 5:1 htb rate %dkbit burst 4k' % (port_name, bw))
+                    cmds.append('tc class add dev %s parent 5:0 classid 5:1 htb rate %dkbit burst 1b' % (port_name, bw))
                 else:
-                    cmds.append('tc class change dev %s parent 5:0 classid 5:1 htb rate %dkbit burst 4k' % (port_name, bw))
+                    cmds.append('tc class change dev %s parent 5:0 classid 5:1 htb rate %dkbit burst 1b peakrate 1bit' % (port_name, bw, bw))
             if pre_latency != latency:
                 if latency is None:
                     cmds.append('tc qdisc del dev %s parent 5:1 handle 10:' % (port_name,))

@@ -153,7 +153,7 @@ def main():
                 # fcntl.ioctl(conn, termios.FIONREAD, sock_size_buf)
                 # if sock_size_buf[0] == 0:
                 #     logger.info('empty sock read')
-                #     request_update()
+                request_update()
 
             except (SystemExit, KeyboardInterrupt):
                 raise

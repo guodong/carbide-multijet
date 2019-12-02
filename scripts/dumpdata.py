@@ -7,7 +7,7 @@ import argparse
 
 
 def get_nodes(path='configs'):
-    ret = []
+    ret = ['01']
     for i in range(0, 400):
         if os.path.exists(path + '/common/fpm-server-%d.log' % i):
             ret.append(str(i))
