@@ -1,6 +1,8 @@
 import json
 import struct
 import os
+import logging
+import time
 
 from ryu.base import app_manager
 from ryu.controller import ofp_event
@@ -17,8 +19,19 @@ def port_is_down(ofpport, ofproto):
            or (ofpport.config & ofproto.OFPPC_PORT_DOWN) > 0
 
 
+logger = logging.getLogger("ryufly.fly")
+
+
 def debug(*msg):
-    print(msg)
+    logger.debug(str(msg))
+
+
+def info(*msg):
+    logger.info(str(msg))
+
+
+def error(*msg):
+    logger.error(str(msg))
 
 
 class FlyApp(app_manager.RyuApp):
@@ -85,7 +98,7 @@ class FlyApp(app_manager.RyuApp):
 
         dp = self.node_id_to_dp.get(node)
         if dp is None:
-            print("error")
+            error("error dp is None")
             return
 
         if op == of.OFPFC_DELETE_STRICT or op == of.OFPFC_DELETE:
@@ -108,6 +121,7 @@ class FlyApp(app_manager.RyuApp):
         dp.send_msg(msg)
 
     def _update(self):
+        info("update start", time.time())
         topo = Topology()
         topo.nodes = self.topo.nodes
         topo.links = self.up_links
@@ -134,6 +148,7 @@ class FlyApp(app_manager.RyuApp):
                     self._delete_rule(match, n)
 
         self.rules = rules2
+        info("update finish", time.time())
 
     def _port_status_change(self, node_id, port_num, status): # status: 'down' / 'up'
         p = (node_id, port_num)
@@ -162,7 +177,7 @@ class FlyApp(app_manager.RyuApp):
 
     @set_ev_cls(ofp_event.EventOFPStateChange, MAIN_DISPATCHER)
     def switch_in_handler(self, ev):
-        print('comming switch')
+        info('comming switch')
         dp = ev.datapath
         ofp = dp.ofproto
         parser = dp.ofproto_parser
@@ -172,7 +187,7 @@ class FlyApp(app_manager.RyuApp):
         self._delete_talbe(n)
         if len(self.node_id_to_dp) == len(self.topo.nodes):
             sleep(1)
-            print('start update......')
+            info('start update......')
             self._update()
 
     @set_ev_cls(ofp_event.EventOFPPortStatus, MAIN_DISPATCHER)

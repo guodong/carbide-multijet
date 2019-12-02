@@ -12,6 +12,7 @@ import json
 import argparse
 from cmd import Cmd
 import random
+import threading
 
 import docker
 import grequests
@@ -267,6 +268,39 @@ class RocketFuel(Cmd):
     def do_write_quagga_configs(self, line):
         self._write_quagga_configs()
 
+    def do_start_iperf_server(self, line):
+        def inner_trd(c):
+            c.exec_run('nohup iperf -s -u &')
+
+        for r in self.routers.values():
+            c = self.containers[r.id]
+            t = threading.Thread(target=inner_trd, args=(c,))
+            print 'start iperf server for ' + r.id
+            t.setDaemon(True)
+            t.start()
+
+    def do_start_iperf_client(self, line):
+        self.iperf_run = True
+        self.topo = Topology()
+        self.topo.load('configs/common/topo.json')
+
+        def inner_trd(c):
+            while self.iperf_run:
+                time.sleep(random.randint(0, 4))
+                print 'start iperf client for ' + r.id
+                random_remote_info = random.choice(list(self.topo.nodes.values()))
+                print random_remote_info
+                c.exec_run('iperf -c' + random_remote_info[1]['fip'][:-3] + ' -u -b 13k -n 8000')
+
+        for r in self.routers.values():
+            c = self.containers[r.id]
+            t = threading.Thread(target=inner_trd, args=(c,))
+            t.setDaemon(True)
+            t.start()
+            
+    def do_stop_iperf_client(self, line):
+        self.iperf_run = False
+
     def do_start_ospf(self, line):
         """ start ospf process"""
         for r in self.routers.values():
@@ -295,15 +329,47 @@ class RocketFuel(Cmd):
         self.do_start_fpm_server(None)
         self.do_start_ospf(None)
 
-    def do_setup_ovs_controller(self, line):
+    def do_start_ryufly(self, line):
+        name = 'ryufly'
+        cwd = os.getcwd()
+        client.containers.run('snlab/ryufly', detach=True, name=name, privileged=False, tty=True,
+                            hostname=name,
+                            volumes={cwd : {'bind': cwd}},
+                            command=cwd + '/ryufly/run.sh')
+        c = client.containers.get(name)
+        if c is None:
+            print("error start container")
+        else:
+            print("start ryufly successfully")
+
+    def do_kill_ryufly(self, line):
+        name = 'ryufly'
+        c = client.containers.get(name)
+        if c is not None:
+            c.remove(force=True)
+            print("removed")
+        else:
+            print("not exists")
+
+    def do_set_ovs_controller_to_ryufly(self, line):
+        name = 'ryufly'
+        c = client.containers.get(name)
+        if c is None:
+            print("error get container")
+            return
+        ipaddr = c.attrs['NetworkSettings']['IPAddress']
+        if len(ipaddr)<1:
+            print("error ip address", ipaddr)
+            return
+        self.do_set_ovs_controller("tcp:%s:6653" % ipaddr)
+
+    def do_set_ovs_controller(self, line):
         args = line.split()
         controller_addr = 'tcp:127.0.0.1:6633'
         if len(args)<1:
             print("default controller address", controller_addr)
         else:
             controller_addr = args[0]
-            if controller_addr == 'external':
-                controller_addr = 'tcp:172.17.0.1:6653'
         
         for n,c in self.containers.items():
             cmd = "ovs-vsctl set-controller s %s" % controller_addr
@@ -311,15 +377,71 @@ class RocketFuel(Cmd):
             c.exec_run(cmd)
 
     def do_eval(self, line):
-        print("TODO")
+
+        test_total_time = 8 # int
+
+        for i in range(8):
+            freq = 0.125* 2**i
+
+            result_dir = "ignored/data/eval/result-%d-%f/" % (test_total_time, freq)
+            os.system("rm -rf " + result_dir)
+            os.system("mkdir -p " + result_dir)
+
+            link_down_log = "%slink-down-up.log" % (result_dir,)
+
+            self.do_start_ryufly(None)
+            self.do_set_ovs_controller_to_ryufly(None)
+            for j in range(10):
+                time.sleep(1)
+                print(j)
+
+            self.do_dump_netstat_ns_config("all")
+            self.do_start_netstat_ns(None)
+            time.sleep(3)
+
+            pair = None
+            if freq == 0.125:
+                links_list = list(sorted(self.topo.links.items()))
+                ri = random.randint(0, len(links_list) - 1)
+                pair = links_list[ri]
+                self._link_down(pair)
+                history = []
+                history.append({
+                    'pair': pair,
+                    'op': 'down',
+                    'time': time.time()
+                })
+                time.sleep(8)
+                with open(link_down_log, 'w') as f:
+                    json.dump(history, f, indent=2)
+            else:
+                self.do_link_down_test("%s %d %f" % (link_down_log, test_total_time, freq))
+            time.sleep(5)
+
+            self.do_kill_netstat_ns(None)
+            time.sleep(1)
+            self.do_kill_ryufly(None)
+
+            os.system("mv result.dat %snetstat-ns-result.dat" % (result_dir, ))
+            os.system("mv configs/common/ryufly.log %sryufly.log" % (result_dir, ))
+
+            if pair is not None:
+                self._link_up(pair)
+            time.sleep(3)
 
     def do_setup_latency(self, line):
         for l in self.topo.links.items():
             self._link_set_bw_latency(l, 64, None)
         for n in self.topo.nodes:
             self._port_set_bw_latency(n, 'eth0', 64, None)
-        # time.sleep(3)
-        # self.do_link_down_test('configs/common/link_down_test.log')
+    
+    def do_setup_latency_ryufly_eth0(self, line):
+        name = 'ryufly'
+        c = client.containers.get(name)
+        if c is None:
+            print("not exists")
+        else:
+            self._port_set_bw_latency(name, 'eth0', 64, None)
 
     def do_link_down_test(self, line):
         """link down test"""
@@ -533,6 +655,13 @@ class RocketFuel(Cmd):
         print('test ready done!')
 
     def do_dump_netstat_ns_config(self, line):
+        args = line.split()
+
+        if len(args)>=1 and args[0]=='all':
+            dumpall = True
+        else:
+            dumpall = False
+
         lines = []
         for n, ports in self.topo.nodes.items():
             pid = client.containers.get(n).attrs['State']['Pid']
@@ -540,11 +669,28 @@ class RocketFuel(Cmd):
             for p in ports.values():
                 if p['type'] == 'veth':
                     names.append(p['name'])
-            lines.append("%d %d %s\n" % (pid, len(names), ' '.join(names)))
+            if dumpall:
+                names.append('eth0')
+            lines.append("%s %d %d %s\n" % (n, pid, len(names), ' '.join(names)))
+
+        if dumpall:
+            c = client.containers.get('ryufly')
+            if c is None:
+                print("warning: no ryufly container")
+            else:
+                pid = c.attrs['State']['Pid']
+                lines.append("ryufly %d 1 eth0" % (pid, ))
+
         with open('configs/common/netstat_ns.conf', 'w') as f:
             for l in lines:
                 f.write(l)
         print(lines)
+    
+    def do_start_netstat_ns(self, line):
+        os.system("./ignored/netstat-ns/netstat-ns 100 configs/common/netstat_ns.conf &")
+    
+    def do_kill_netstat_ns(self, line):
+        os.system("pkill -e netstat-ns")
 
     def _read_config_path(self, i):
         with open('configs/common/random_path.json') as f:
