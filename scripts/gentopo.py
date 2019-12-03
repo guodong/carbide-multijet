@@ -9,7 +9,7 @@ def gen_topo(n):
     # G = nx.fast_gnp_random_graph(n, 0.132, 1)
     G = nx.fast_gnp_random_graph(n, 0.071, 1)
     print len(G.edges)
-    return
+
     topo = {
         'nodes': [],
         'links': []
@@ -18,13 +18,14 @@ def gen_topo(n):
         topo['nodes'].append(no)
     for e in G.edges:
         topo['links'].append(e)
-    print json.dumps(topo)
-    with open('topo%s.json' % str(n), 'w') as f:
-        json.dump(topo, f, indent=2)
+    # print json.dumps(topo)
+
     nx.draw(G, with_labels=True)
     plt.savefig("topo%s.png" % str(n))
     plt.show()
     return
+    with open('topo%s.json' % str(n), 'w') as f:
+        json.dump(topo, f, indent=2)
     result = {}
 
     for i in range(n):

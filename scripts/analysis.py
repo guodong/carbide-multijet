@@ -321,7 +321,7 @@ def cal():
 def pc_cdf():
     bdata = []
     pdata = []
-    with open("ignored/ospfcount/result.4.dat") as f:
+    with open("ignored/ospfcount/result.0125.dat") as f:
         total_bytes = 0
         total_pkts = 0
         current_sw = 1
@@ -341,10 +341,11 @@ def pc_cdf():
 
             else:
                 break
+        print sum(pdata)
         # cdf(bdata, '#Bytes')
         cdf(pdata, '#Pkts')
 
-pc_cdf()
+# pc_cdf()
 
 def get_time(line):
     timestr = line[:26]
@@ -366,6 +367,7 @@ def new_ospf():
     starts=[1575353372.93,1575353572.99]
     first_event = 1575352602.32
     start = 1675381401.00
+    step =[0, 120, 220, 360, 480, 600, 750, 880]
     for i in range(64):
         with open('ignored/ospflog/%s.log' % i) as f:
             while True:
@@ -379,7 +381,7 @@ def new_ospf():
                     # if tmstamp > timep[round] + 10:
                     #     break
                     if 'MESSAGE: ZEBRA_INTERFACE' in line: # event
-                        if tmstamp < start and tmstamp > first_event + 0:
+                        if tmstamp < start and tmstamp > first_event + step[7]:
                             start = tmstamp
                 else:
                     break
@@ -405,6 +407,8 @@ def new_ospf():
                             y.append(i)
                 else:
                     break
+    print np.min(time_list), np.max(time_list), np.average(time_list), np.median(time_list)
+    # return
     event_list = []
     y1 = []
     for i in range(64):
@@ -425,7 +429,9 @@ def new_ospf():
                             y1.append(i)
                 else:
                     break
-
+    print np.max(event_list)
+    print np.max(time_list) - np.max(event_list)
+    return
     plt.scatter(time_list, y, label='FIB update', s=1.5)
     plt.scatter(event_list, y1, label='Event', s=3)
     plt.grid(True)
@@ -435,7 +441,7 @@ def new_ospf():
     plt.xlim(0)
     plt.show()
 
-# new_ospf()
+new_ospf()
 
 
 def show():
