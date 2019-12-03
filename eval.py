@@ -241,7 +241,7 @@ class Main(Cmd):
             pid = node.container().attrs['State']['Pid']
             names = []
             for p in node.ports:
-                names.append(p.id)
+                names.append('e' + str(p.id))
             lines.append("r%s %s %s %s\n" % (str(nid), str(pid), len(names), ' '.join(names)))
 
         with open('configs/common/netstat_ns.conf', 'w') as f:
