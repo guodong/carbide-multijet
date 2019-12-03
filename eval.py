@@ -208,7 +208,7 @@ class Main(Cmd):
         if line:
             self.do_link_down_test('1 1')
             time.sleep(2)
-            self.do_link_up_all()
+            self.do_link_up_all(None)
             return
 
         test_total_time = 8  # int
