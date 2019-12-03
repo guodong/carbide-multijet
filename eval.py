@@ -118,10 +118,10 @@ class Main(Cmd):
     def _write_quagga_configs(self):
         for node_id, node in self.topo.nodes.items():
             print('write quagga configs', node_id)
-            with open('configs/' + node_id + '/zebra.conf', 'w') as f:
+            with open('configs/%s/zebra.conf' % node.id, 'w') as f:
                 f.write('hostname Router\npassword zebra\nenable password zebra')
 
-            with open('configs/' + node_id + '/ospfd.conf', 'w') as f:
+            with open('configs/%s/ospfd.conf % node.id', 'w') as f:
                 f.write('hostname ospfd\npassword zebra\nlog stdout\n')
                 f.write('!\nrouter ospf\n')
 
