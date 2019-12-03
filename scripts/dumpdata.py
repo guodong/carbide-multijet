@@ -52,8 +52,14 @@ def get_fpm_history(nodes, dir='configs'):
     data = {}
     for node_id in nodes:
         path = dir + "/common/fpm-history-%s.json" % node_id
-        with open(path) as f:
-            history = json.load(f)
+        while True:
+            try:
+                with open(path) as f:
+                    history = json.load(f)
+                    break
+            except:
+                pass
+
         time_list = []
         for item in history:
             if str(item['type']) == 'request_update':
