@@ -121,7 +121,7 @@ class Main(Cmd):
             with open('configs/%s/zebra.conf' % node.id, 'w') as f:
                 f.write('hostname Router\npassword zebra\nenable password zebra')
 
-            with open('configs/%s/ospfd.conf % node.id', 'w') as f:
+            with open('configs/%s/ospfd.conf' % node.id, 'w') as f:
                 f.write('hostname ospfd\npassword zebra\nlog stdout\n')
                 f.write('!\nrouter ospf\n')
 
