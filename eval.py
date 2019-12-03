@@ -242,7 +242,7 @@ class Main(Cmd):
             names = []
             for p in node.ports:
                 names.append(p.id)
-            lines.append("r%s %s %s %s\n" % (nid, pid, len(names), ' '.join(names)))
+            lines.append("r%s %s %s %s\n" % (str(nid), str(pid), len(names), ' '.join(names)))
 
         with open('configs/common/netstat_ns.conf', 'w') as f:
             for l in lines:
