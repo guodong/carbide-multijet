@@ -59,13 +59,13 @@ class Link:
         print 'link up (%s,%s) (%s,%s)' % (self.p0.node.id, self.p0.id, self.p1.node.id, self.p1.id)
         self.p0.node.nsenter_exec("ifconfig e%s up" % self.p0.id)
         self.p1.node.nsenter_exec("ifconfig e%s up" % self.p1.id)
-        self.status = 0
+        self.status = 1
 
     def down(self):
         print 'link down (%s,%s) (%s,%s)' % (self.p0.node.id, self.p0.id, self.p1.node.id, self.p1.id)
         self.p0.node.nsenter_exec("ifconfig e%s down" % self.p0.id)
         self.p1.node.nsenter_exec("ifconfig e%s down" % self.p1.id)
-        self.status = 1
+        self.status = 0
 
     def toggle(self):
         if self.status == 1:

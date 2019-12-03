@@ -133,6 +133,10 @@ def main():
                 d = bytearray(data)
                 x, y, size = struct.unpack('>ccH', d)
                 body = conn.recv(size - 4)
+                if m.HasField('add_route') or m.HasField('delete_route'):
+                    log_time()
+
+                continue
                 m = fpm.Message()
                 m.ParseFromString(body)
                 logger.info(m)
