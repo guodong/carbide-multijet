@@ -248,7 +248,8 @@ class Main(Cmd):
 
     def do_clean_ospf_log(self, line):
         for n in self.topo.nodes.values():
-            n.nsenter_exec('echo "" > /common/ospflog/%s.log' % n.id)
+            n.container().exec_run('echo "" > /common/ospflog/%s.log' % n.id)
+
 
     def do_link(self, line):
         """link down/up  host1 host2"""
