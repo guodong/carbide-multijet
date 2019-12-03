@@ -135,6 +135,34 @@ class Main(Cmd):
         for r in self.topo.nodes.values():
             utils.mkdir_p('configs/' + r.id)
 
+    def do_start_ospf(self, line):
+        """ start ospf process"""
+        for r in self.topo.nodes.values():
+            print 'start ospf for ' + r.id
+            c = r.container
+            c.exec_run('zebra -d -f /etc/quagga/zebra.conf --fpm_format protobuf')
+            c.exec_run('ospfd -d -f /etc/quagga/ospfd.conf')
+
+    def do_start_fpm_server(self, line):
+        """ start fpm server process"""
+        for r in self.topo.nodes.values():
+            print 'start fpm for ' + r.id
+            c = r.container
+            c.exec_run('python /fpm/main.py &', detach=True)
+
+    def do_kill_ospf_and_server(self, line):
+        """ kill ospf and fpm server process"""
+        os.system('pkill -f -e "^python /fpm/main.py"')
+        os.system('pkill -f -e "^zebra"')
+        os.system('pkill -f -e "^ospfd"')
+
+    def do_start_ospf_and_server(self, line):
+        """ start ospf and fpm server prcocess"""
+        os.system("rm -f configs/common/fpm-history-*.json")
+        os.system("rm -f configs/common/fpm-server-*.log")
+        self.do_start_fpm_server(None)
+        self.do_start_ospf(None)
+
     def stop(self):
         print 'cleaning containers...'
 
