@@ -1,4 +1,5 @@
 import argparse
+import random
 from cmd import Cmd
 import json
 import os
@@ -15,6 +16,22 @@ class Port:
         self.node = node
         self.id = id
         self.ip = ''
+        self.bw = None
+
+    def set_bw(self, bw):
+        cmds = []
+        cmds.append('tc qdisc del dev e%s root' % (self.id))
+        cmds.append('tc qdisc add dev e%s root handle 5:0 htb default 1' % (self.id,))
+        if self.bw is None:
+            cmds.append('tc class del dev e%s parent 5:0 classid 5:1' % (self.id,))
+            cmds.append('tc class add dev e%s parent 5:0 classid 5:1 htb rate %dkbit' % (self.id, bw))
+        else:
+            cmds.append('tc class change dev e%s parent 5:0 classid 5:1 htb rate %dkbit' % (
+                self.id, bw))
+        self.bw = bw
+        for cmd in cmds:
+            print(self.node.id, cmd)
+            self.node.nsenter_exec(cmd)
 
 
 class Node:
@@ -24,6 +41,10 @@ class Node:
         self.port_offset = 0
         self.container = None
 
+    def nsenter_exec(self, cmd):
+        pid = self.container.attrs['State']['Pid']
+        utils.nsenter_run(pid, cmd)
+
 
 class Link:
     def __init__(self, lid, p0, p1):
@@ -32,11 +53,27 @@ class Link:
         self.p0 = p0
         self.p1 = p1
 
+    def _up(self):
+        self.p0.node.nsenter_exec("ifconfig e%s up" % self.p0.id)
+        self.p1.node.nsenter_exec("ifconfig e%s up" % self.p1.id)
+
+    def _down(self):
+        self.p0.node.nsenter_exec("ifconfig e%s down" % self.p0.id)
+        self.p1.node.nsenter_exec("ifconfig e%s down" % self.p1.id)
+
+    def toggle(self):
+        if self.status == 1:
+            self._down()
+            self.status = 0
+        else:
+            self._up()
+            self.status = 1
+
 
 class Topology:
     def __init__(self):
         self.nodes = {}
-        self.links = {}
+        self.links = []
 
 
 class Main(Cmd):
@@ -66,25 +103,25 @@ class Main(Cmd):
                 self.topo.nodes[l[1]].ports.append(p1)
                 lid = str(l[0]) + '-' + str(l[1])
                 link = Link(lid, p0, p1)
-                self.topo.links[lid] = link
+                self.topo.links.append(link)
 
     def do_start_network(self, line):
         self._make_configs_directory()
         for r in self.topo.nodes.values():
             print 'starting ' + r.id
             r.container = client.containers.run('snlab/dovs-quagga', detach=True, name=r.id, privileged=True, tty=True,
-                                              hostname=r.id,
-                                              volumes={os.getcwd() + '/configs/' + r.id: {'bind': '/etc/quagga'},
-                                                       os.getcwd() + '/bootstrap': {'bind': '/bootstrap'},
-                                                       os.getcwd() + '/fpm': {'bind': '/fpm'},
-                                                       os.getcwd() + '/multijet': {'bind': '/multijet'},
-                                                       os.getcwd() + '/configs/common': {'bind': '/common'}},
-                                              command='/bootstrap/start.sh')
+                                                hostname=r.id,
+                                                volumes={os.getcwd() + '/configs/' + r.id: {'bind': '/etc/quagga'},
+                                                         os.getcwd() + '/bootstrap': {'bind': '/bootstrap'},
+                                                         os.getcwd() + '/fpm': {'bind': '/fpm'},
+                                                         os.getcwd() + '/multijet': {'bind': '/multijet'},
+                                                         os.getcwd() + '/configs/common': {'bind': '/common'}},
+                                                command='/bootstrap/start.sh')
 
         print 'setup links'
         i = 0
         j = 0
-        for l in self.topo.links.values():
+        for l in self.topo.links:
             srcPid = client.containers.get(l.p0.node.id).attrs['State']['Pid']
             dstPid = client.containers.get(l.p1.node.id).attrs['State']['Pid']
             cmd = 'nsenter -t ' + str(srcPid) + ' -n ip link add e' + str(
@@ -163,6 +200,74 @@ class Main(Cmd):
         self.do_start_fpm_server(None)
         self.do_start_ospf(None)
 
+    def do_eval(self, line):
+
+        test_total_time = 8  # int
+
+        for i in range(8):
+            freq = 0.125 * 2 ** i
+
+            result_dir = "ignored/data/eval/result-%d-%f/" % (test_total_time, freq)
+            os.system("rm -rf " + result_dir)
+            os.system("mkdir -p " + result_dir)
+
+            self.do_link_down_test("%d %f" % (test_total_time, freq))
+            time.sleep(60)
+            self.do_link_up_all()
+            time.sleep(60)
+
+    def do_link_up_all(self, line):
+        for l in self.topo.links:
+            if l.status == 0:
+                l.up()
+
+    def do_link_down_test(self, line):
+        """link down test"""
+        args = line.split()
+
+        total_time = int(args[0])  # second
+        frequency = float(args[1])  # HZ
+
+        for i in range(int(total_time * frequency)):
+            ri = random.randint(0, len(self.topo.links) - 1)
+            link = self.topo.links[ri]
+            link.toggle()
+            time.sleep((1.0 / frequency))
+
+    def do_set_bw(self, bw):  # ((n1, p1), (n2, p2))
+        for l in self.topo.links:
+            l.p0.set_bw(bw)
+            l.p1.set_bw(bw)
+
+    def _port_set_bw_latency(self, node, port_name, bw):  # '11' 'e0'
+        status = self.port_status.setdefault((node, port_name), {})
+        pre_bw = status.setdefault('bw', None)
+        pre_latency = status.setdefault('latency', None)
+        cmds = []
+        if pre_bw is None and pre_latency is None:
+            cmds.append('tc qdisc del dev %s root' % (port_name,))
+            cmds.append('tc qdisc add dev %s root handle 5:0 htb default 1' % (port_name,))
+        if pre_bw != bw:
+            if bw is None:
+                cmds.append('tc class del dev %s parent 5:0 classid 5:1' % (port_name,))
+            elif pre_bw is None:
+                cmds.append('tc class add dev %s parent 5:0 classid 5:1 htb rate %dkbit burst 1b' % (port_name, bw))
+            else:
+                cmds.append('tc class change dev %s parent 5:0 classid 5:1 htb rate %dkbit burst 1b peakrate 1bit' % (
+                    port_name, bw, bw))
+        if pre_latency != latency:
+            if latency is None:
+                cmds.append('tc qdisc del dev %s parent 5:1 handle 10:' % (port_name,))
+            elif pre_latency is None:
+                cmds.append('tc qdisc add dev %s parent 5:1 handle 10: netem delay %dms' % (port_name, latency))
+            else:
+                cmds.append('tc qdisc change dev %s parent 5:1 handle 10: netem delay %dms' % (port_name, latency))
+        status['bw'] = bw
+        status['latency'] = latency
+        for cmd in cmds:
+            print(node, cmd)
+            self.node_nsenter_exec(node, cmd)
+
     def stop(self):
         print 'cleaning containers...'
 
@@ -171,6 +276,9 @@ class Main(Cmd):
             node.container.remove(force=True)
 
         exit(0)
+
+    def do_exit(self, line):
+        return True
 
     def do_just_exit(self, line):
         """just exit this shell, but keep container running"""
