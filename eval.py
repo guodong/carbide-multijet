@@ -39,7 +39,9 @@ class Node:
         self.id = id
         self.ports = []
         self.port_offset = 0
-        self.container = None
+
+    def container(self):
+        return client.containers.get(self.id)
 
     def nsenter_exec(self, cmd):
         pid = client.containers.get(self.id).attrs['State']['Pid']
@@ -111,7 +113,7 @@ class Main(Cmd):
         self._make_configs_directory()
         for r in self.topo.nodes.values():
             print 'starting ' + r.id
-            r.container = client.containers.run('snlab/dovs-quagga', detach=True, name=r.id, privileged=True, tty=True,
+            client.containers.run('snlab/dovs-quagga', detach=True, name=r.id, privileged=True, tty=True,
                                                 hostname=r.id,
                                                 volumes={os.getcwd() + '/configs/' + r.id: {'bind': '/etc/quagga'},
                                                          os.getcwd() + '/bootstrap': {'bind': '/bootstrap'},
@@ -124,8 +126,8 @@ class Main(Cmd):
         i = 0
         j = 0
         for l in self.topo.links:
-            srcPid = client.containers.get(l.p0.node.id).attrs['State']['Pid']
-            dstPid = client.containers.get(l.p1.node.id).attrs['State']['Pid']
+            srcPid = l.p0.node.container().attrs['State']['Pid']
+            dstPid = l.p1.node.container().attrs['State']['Pid']
             cmd = 'nsenter -t ' + str(srcPid) + ' -n ip link add e' + str(
                 l.p0.id) + ' type veth peer name e' + str(l.p1.id) + ' netns ' + str(dstPid)
             os.system(cmd)
@@ -152,7 +154,7 @@ class Main(Cmd):
         # configure ospf rules
         for node in self.topo.nodes.values():
             print 'configure ospf rule of ' + node.id
-            node.container.exec_run('/bootstrap/start.py', detach=True)
+            node.container().exec_run('/bootstrap/start.py', detach=True)
 
     def _write_quagga_configs(self):
         for node_id, node in self.topo.nodes.items():
@@ -178,7 +180,7 @@ class Main(Cmd):
         """ start ospf process"""
         for r in self.topo.nodes.values():
             print 'start ospf for ' + r.id
-            c = r.container
+            c = r.container()
             c.exec_run('zebra -d -f /etc/quagga/zebra.conf --fpm_format protobuf')
             c.exec_run('ospfd -d -f /etc/quagga/ospfd.conf')
 
@@ -186,7 +188,7 @@ class Main(Cmd):
         """ start fpm server process"""
         for r in self.topo.nodes.values():
             print 'start fpm for ' + r.id
-            c = r.container
+            c = r.container()
             c.exec_run('python /fpm/main.py &', detach=True)
 
     def do_kill_ospf_and_server(self, line):
@@ -247,7 +249,7 @@ class Main(Cmd):
 
         for node in self.topo.nodes.values():
             print("clean container %s" % node.id)
-            node.container.remove(force=True)
+            node.container().remove(force=True)
 
         exit(0)
 
