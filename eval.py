@@ -218,10 +218,6 @@ class Main(Cmd):
             freq = 0.125 * 2 ** i
             print "do freq: %s at %s" % (freq, time.time())
 
-            result_dir = "ignored/data/eval/result-%d-%f/" % (test_total_time, freq)
-            os.system("rm -rf " + result_dir)
-            os.system("mkdir -p " + result_dir)
-
             self.do_link_down_test("%d %f" % (test_total_time, freq))
             time.sleep(60)
             self.do_link_up_all(None)
@@ -249,6 +245,10 @@ class Main(Cmd):
         for l in self.topo.links:
             l.p0.set_bw(bw)
             l.p1.set_bw(bw)
+
+    def do_clean_ospf_log(self, line):
+        for n in self.topo.nodes.values():
+            n.nsenter_exec('echo "" > /common/ospflog/%s.log' % n.id)
 
     def do_link(self, line):
         """link down/up  host1 host2"""
