@@ -42,7 +42,7 @@ class Node:
         self.container = None
 
     def nsenter_exec(self, cmd):
-        pid = self.container.attrs['State']['Pid']
+        pid = client.containers.get(self.id).attrs['State']['Pid']
         utils.nsenter_run(pid, cmd)
 
 
