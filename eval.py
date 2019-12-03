@@ -205,6 +205,11 @@ class Main(Cmd):
         self.do_start_ospf(None)
 
     def do_eval(self, line):
+        if line:
+            self.do_link_down_test(1, 1)
+            time.sleep(2)
+            self.do_link_up_all()
+            return
 
         test_total_time = 8  # int
 
@@ -243,6 +248,27 @@ class Main(Cmd):
         for l in self.topo.links:
             l.p0.set_bw(bw)
             l.p1.set_bw(bw)
+
+    def do_link(self, line):
+        """link down/up  host1 host2"""
+        args = line.split()
+        if len(args) < 3:
+            print("error args")
+            return
+        op, n1, n2 = args[0], args[1], args[2]
+        if n1 not in self.topo.nodes or n2 not in self.topo.nodes:
+            print("error args")
+            return
+        for start, end in self.topo.links.items():
+            self.current = time.time()
+            if start[0] == n1 and end[0] == n2:
+                if op == 'down':
+                    self._link_down((start, end))
+                elif op == 'up':
+                    self._link_up((start, end))
+                break
+        else:
+            print("not find link")
 
     def stop(self):
         print 'cleaning containers...'
