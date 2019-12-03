@@ -3,7 +3,7 @@ import operator
 from functools import reduce
 import numpy as np
 import json
-
+import datetime
 
 def pkt_rate():
     linfo = []
@@ -309,7 +309,6 @@ def cal():
             time_list = d[id]
             out.append(time_list[-1])
         print np.min(out), np.max(out), np.mean(out), np.median(out)
-cal()
 
 def pc_cdf():
     bdata = {}
@@ -346,4 +345,121 @@ def pc_cdf():
         # cdf(d, '#Bytes')
         cdf(p, '#Pkts')
 
-pc_cdf()
+
+def get_time(line):
+    timestr = line[:26]
+    return float(datetime.datetime.strptime(timestr, '%Y/%m/%d %H:%M:%S.%f').strftime('%s.%f'))
+
+
+def new_ospf():
+
+    round = 5
+
+    # timep = [1575381402.0, 1575381530.0, 1575381658.0, 1575381786.94, 1575381915.32, 1575382043.93, 1575382172.92, 1575382302.85]
+    # timep = [i - 7 * 3600 for i in timep]
+    # starttimep = []
+    # data = {
+    #     '1': {
+    #
+    #     }
+    # }
+    starts=[1575353372.93,1575353572.99]
+    first_event = 1575352602.32
+    start = 1675381401.00
+    for i in range(64):
+        with open('ignored/ospflog/%s.log' % i) as f:
+            while True:
+                line = f.readline()
+                if line:
+                    if len(line) < 2:
+                        continue
+                    tmstamp = get_time(line)
+                    # if tmstamp < timep[round]: # here adjust walk
+                    #     continue
+                    # if tmstamp > timep[round] + 10:
+                    #     break
+                    if 'MESSAGE: ZEBRA_INTERFACE' in line: # event
+                        if tmstamp < start and tmstamp > first_event + 0:
+                            start = tmstamp
+                else:
+                    break
+        print start
+
+    time_list = []
+    y = []
+    for i in range(64):
+        with open('ignored/ospflog/%s.log' % i) as f:
+            while True:
+                line = f.readline()
+                if line:
+                    if len(line) < 2:
+                        continue
+                    tmstamp = get_time(line)
+                    if tmstamp < start: # here adjust walk
+                        continue
+                    if tmstamp > start + 25:
+                        break
+                    if 'ZEBRA_IPV4' in line: # event
+                        if tmstamp > start:
+                            time_list.append(tmstamp - start)
+                            y.append(i)
+                else:
+                    break
+    event_list = []
+    y1 = []
+    for i in range(64):
+        with open('ignored/ospflog/%s.log' % i) as f:
+            while True:
+                line = f.readline()
+                if line:
+                    if len(line) < 2:
+                        continue
+                    tmstamp = get_time(line)
+                    if tmstamp < start: # here adjust walk
+                        continue
+                    if tmstamp > start + 20:
+                        break
+                    if 'MESSAGE: ZEBRA_INTERFACE' in line: # event
+                        if tmstamp >= start:
+                            event_list.append(tmstamp - start)
+                            y1.append(i)
+                else:
+                    break
+
+    plt.scatter(time_list, y, label='FIB update', s=1.5)
+    plt.scatter(event_list, y1, label='Event', s=3)
+    plt.grid(True)
+    plt.legend()
+    plt.xlabel('Time(s)')
+    plt.ylabel('Router id')
+    plt.xlim(0)
+    plt.show()
+
+new_ospf()
+
+
+def show():
+    event_list = []
+    y1 = []
+    for i in range(64):
+        with open('ignored/ospflog/%s.log' % i) as f:
+            while True:
+                line = f.readline()
+                if line:
+                    if len(line) < 2:
+                        continue
+                    tmstamp = get_time(line)
+                    if 'MESSAGE: ZEBRA_INTERFACE' in line:  # event
+                        event_list.append(tmstamp-1575352602)
+                        y1.append(i)
+                else:
+                    break
+    plt.scatter(event_list, y1, label='Event', s=3)
+    plt.grid(True)
+    plt.legend()
+    plt.xlabel('Time(s)')
+    plt.ylabel('Router id')
+    # plt.xlim(0)
+    plt.show()
+
+# show()

@@ -228,6 +228,33 @@ class Main(Cmd):
             if l.status == 0:
                 l.up()
 
+    def do_dump_netstat_ns_config(self, line):
+        args = line.split()
+
+        if len(args) >= 1 and args[0] == 'all':
+            dumpall = True
+        else:
+            dumpall = False
+
+        lines = []
+        for nid, node in self.topo.nodes.items():
+            pid = node.container().attrs['State']['Pid']
+            names = []
+            for p in node.ports:
+                names.append(p.id)
+            lines.append("r%s %d %d %s\n" % (nid, pid, len(names), ' '.join(names)))
+
+        with open('configs/common/netstat_ns.conf', 'w') as f:
+            for l in lines:
+                f.write(l)
+        print(lines)
+
+    def do_start_netstat_ns(self, line):
+        os.system("../multijet-eval3/ignored/netstat-ns/netstat-ns 100 configs/common/netstat_ns.conf &")
+
+    def do_kill_netstat_ns(self, line):
+        os.system("pkill -e netstat-ns")
+
     def do_link_down_test(self, line):
         """link down test"""
         args = line.split()
