@@ -7,7 +7,7 @@ import json
 
 def gen_topo(n):
     # G = nx.fast_gnp_random_graph(n, 0.132, 1)
-    G = nx.fast_gnp_random_graph(n, 132, 1)
+    G = nx.fast_gnp_random_graph(n, 0.071, 1)
     topo = {
         'nodes': [],
         'links': []
@@ -36,7 +36,7 @@ def gen_topo(n):
         f.write(json.dumps(result))
 
 
-gen_topo(3)
+gen_topo(64)
 
 
 def draw_graph(nodes):
