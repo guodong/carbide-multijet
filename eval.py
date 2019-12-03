@@ -161,7 +161,7 @@ class Main(Cmd):
             print('write quagga configs', node_id)
             with open('configs/%s/zebra.conf' % node.id, 'w') as f:
                 f.write(
-                    'hostname Router\npassword zebra\nenable password zebra\nlog file /common/ospflog/%s.log\ndebug zebra packet\n' % node_id)
+                    'hostname Router\npassword zebra\nenable password zebra\nlog file /common/ospflog/%s.log\ndebug zebra packet\nlog timestamp precision 6\n' % node_id)
 
             with open('configs/%s/ospfd.conf' % node.id, 'w') as f:
                 f.write('hostname ospfd\npassword zebra\n')
