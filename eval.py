@@ -206,7 +206,7 @@ class Main(Cmd):
 
     def do_eval(self, line):
         if line:
-            self.do_link_down_test(1, 1)
+            self.do_link_down_test('1 1')
             time.sleep(2)
             self.do_link_up_all()
             return
