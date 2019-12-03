@@ -114,13 +114,13 @@ class Main(Cmd):
         for r in self.topo.nodes.values():
             print 'starting ' + r.id
             client.containers.run('snlab/dovs-quagga', detach=True, name=r.id, privileged=True, tty=True,
-                                                hostname=r.id,
-                                                volumes={os.getcwd() + '/configs/' + r.id: {'bind': '/etc/quagga'},
-                                                         os.getcwd() + '/bootstrap': {'bind': '/bootstrap'},
-                                                         os.getcwd() + '/fpm': {'bind': '/fpm'},
-                                                         os.getcwd() + '/multijet': {'bind': '/multijet'},
-                                                         os.getcwd() + '/configs/common': {'bind': '/common'}},
-                                                command='/bootstrap/start.sh')
+                                  hostname=r.id,
+                                  volumes={os.getcwd() + '/configs/' + r.id: {'bind': '/etc/quagga'},
+                                           os.getcwd() + '/bootstrap': {'bind': '/bootstrap'},
+                                           os.getcwd() + '/fpm': {'bind': '/fpm'},
+                                           os.getcwd() + '/multijet': {'bind': '/multijet'},
+                                           os.getcwd() + '/configs/common': {'bind': '/common'}},
+                                  command='/bootstrap/start.sh')
 
         print 'setup links'
         i = 0
@@ -160,10 +160,11 @@ class Main(Cmd):
         for node_id, node in self.topo.nodes.items():
             print('write quagga configs', node_id)
             with open('configs/%s/zebra.conf' % node.id, 'w') as f:
-                f.write('hostname Router\npassword zebra\nenable password zebra')
+                f.write(
+                    'hostname Router\npassword zebra\nenable password zebra\nlog file /common/ospflog/%s.log\ndebug zebra packet\n' % node_id)
 
             with open('configs/%s/ospfd.conf' % node.id, 'w') as f:
-                f.write('hostname ospfd\npassword zebra\nlog file /common/ospflog/%s.log\ndebug zebra packet\n' % node_id)
+                f.write('hostname ospfd\npassword zebra\n')
                 f.write('!\nrouter ospf\n')
 
                 for port in node.ports:
