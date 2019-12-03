@@ -84,7 +84,7 @@ class Main(Cmd):
         print 'setup links'
         i = 0
         j = 0
-        for l in self.topo.links:
+        for l in self.topo.links.values():
             srcPid = client.containers.get(l.p0.node.id).attrs['State']['Pid']
             dstPid = client.containers.get(l.p1.node.id).attrs['State']['Pid']
             cmd = 'nsenter -t ' + str(srcPid) + ' -n ip link add e' + str(
