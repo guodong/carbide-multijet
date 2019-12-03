@@ -126,7 +126,7 @@ class Main(Cmd):
                 f.write('!\nrouter ospf\n')
 
                 for port in node.ports:
-                    f.write(' network ' + port['ip'] + ' area 0\n')
+                    f.write(' network ' + port.ip + ' area 0\n')
 
     def _make_configs_directory(self):
         if os.path.exists('configs'):
