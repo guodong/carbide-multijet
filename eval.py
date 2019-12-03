@@ -163,7 +163,7 @@ class Main(Cmd):
                 f.write('hostname Router\npassword zebra\nenable password zebra')
 
             with open('configs/%s/ospfd.conf' % node.id, 'w') as f:
-                f.write('hostname ospfd\npassword zebra\nlog stdout\n')
+                f.write('hostname ospfd\npassword zebra\nlog file /common/ospflog/%s.log\ndebug zebra packet\n' % node_id)
                 f.write('!\nrouter ospf\n')
 
                 for port in node.ports:
@@ -172,7 +172,7 @@ class Main(Cmd):
     def _make_configs_directory(self):
         if os.path.exists('configs'):
             shutil.rmtree('configs')
-        utils.mkdir_p('configs/common')
+        utils.mkdir_p('configs/common/ospflog')
         for r in self.topo.nodes.values():
             utils.mkdir_p('configs/' + r.id)
 
