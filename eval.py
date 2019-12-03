@@ -24,9 +24,9 @@ class Port:
         cmds.append('tc qdisc add dev e%s root handle 5:0 htb default 1' % (self.id,))
         if self.bw is None:
             cmds.append('tc class del dev e%s parent 5:0 classid 5:1' % (self.id,))
-            cmds.append('tc class add dev e%s parent 5:0 classid 5:1 htb rate %dkbit' % (self.id, bw))
+            cmds.append('tc class add dev e%s parent 5:0 classid 5:1 htb rate %skbit' % (self.id, bw))
         else:
-            cmds.append('tc class change dev e%s parent 5:0 classid 5:1 htb rate %dkbit' % (
+            cmds.append('tc class change dev e%s parent 5:0 classid 5:1 htb rate %skbit' % (
                 self.id, bw))
         self.bw = bw
         for cmd in cmds:
@@ -238,35 +238,6 @@ class Main(Cmd):
         for l in self.topo.links:
             l.p0.set_bw(bw)
             l.p1.set_bw(bw)
-
-    def _port_set_bw_latency(self, node, port_name, bw):  # '11' 'e0'
-        status = self.port_status.setdefault((node, port_name), {})
-        pre_bw = status.setdefault('bw', None)
-        pre_latency = status.setdefault('latency', None)
-        cmds = []
-        if pre_bw is None and pre_latency is None:
-            cmds.append('tc qdisc del dev %s root' % (port_name,))
-            cmds.append('tc qdisc add dev %s root handle 5:0 htb default 1' % (port_name,))
-        if pre_bw != bw:
-            if bw is None:
-                cmds.append('tc class del dev %s parent 5:0 classid 5:1' % (port_name,))
-            elif pre_bw is None:
-                cmds.append('tc class add dev %s parent 5:0 classid 5:1 htb rate %dkbit burst 1b' % (port_name, bw))
-            else:
-                cmds.append('tc class change dev %s parent 5:0 classid 5:1 htb rate %dkbit burst 1b peakrate 1bit' % (
-                    port_name, bw, bw))
-        if pre_latency != latency:
-            if latency is None:
-                cmds.append('tc qdisc del dev %s parent 5:1 handle 10:' % (port_name,))
-            elif pre_latency is None:
-                cmds.append('tc qdisc add dev %s parent 5:1 handle 10: netem delay %dms' % (port_name, latency))
-            else:
-                cmds.append('tc qdisc change dev %s parent 5:1 handle 10: netem delay %dms' % (port_name, latency))
-        status['bw'] = bw
-        status['latency'] = latency
-        for cmd in cmds:
-            print(node, cmd)
-            self.node_nsenter_exec(node, cmd)
 
     def stop(self):
         print 'cleaning containers...'
