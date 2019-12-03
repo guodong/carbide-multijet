@@ -5,22 +5,35 @@ import numpy as np
 import json
 import datetime
 
+
+
+def cdf(da, xl='Latency(ms)'):
+    n, bins, patches = plt.hist(da, 400, density=True, cumulative=True, label='CDF',
+                                histtype='step', color='k')
+    patches[0].set_xy(patches[0].get_xy()[:-1])
+    plt.xlabel(xl)
+    plt.ylabel('CDF')
+    plt.show()
+
 def pkt_rate():
     linfo = []
-    with open('ospf_16k_100ms.dat') as f:
+    data = []
+    with open('ignored/ospfcount/result.0125.dat') as f:
         while True:
             line = f.readline()
             if line:
-                if line[:4] == 'pkts':
+                if line[:5] == 'bytes':
                     data = line.split('=')[1].split(' ')
                     result = []
                     for i in range(2, len(data) - 1):
-                        rate = (int(data[i]) - int(data[i - 1])) * 10
-                        result.append(rate)
+                        rate = (int(data[i]) - int(data[i - 1]))
+                        data.append(rate)
 
-                    linfo.append(result)
+                    # linfo.append(result)
             else:
                 break
+    cdf(data, '#bytes')
+    return
 
     d = reduce(operator.add, linfo)
     da = [i for i in d if i != 0]
@@ -34,9 +47,10 @@ def pkt_rate():
     plt.ylabel('CDF')
     plt.show()
 
+# pkt_rate()
 
 def byte_count():
-    with open("ospf_bw64k_fq025hz.dat") as f:
+    with open("ignored/ospfcount/result.16.dat") as f:
         total_bytes = 0
         total_pkts = 0
         while True:
@@ -52,6 +66,8 @@ def byte_count():
             else:
                 break
         print total_bytes, total_pkts
+
+# byte_count()
 
 
 def byte_rate():
@@ -106,15 +122,6 @@ def byte_rate():
         plt.xlabel('Rate(bps)')
         plt.ylabel('CDF')
         plt.show()
-
-
-def cdf(da, xl='Latency(ms)'):
-    n, bins, patches = plt.hist(da, 400, density=True, cumulative=True, label='CDF',
-                                histtype='step', color='k')
-    patches[0].set_xy(patches[0].get_xy()[:-1])
-    plt.xlabel(xl)
-    plt.ylabel('CDF')
-    plt.show()
 
 
 # byte_rate()
@@ -264,14 +271,15 @@ def time_count():
 
 def br1():
     x = [0.125, 0.25, 0.5, 1, 2, 4, 8, 16]
-    y = [51088, 106782, 198390, 370120, 615622, 1018816, 1313168, 1471672]
+    y = [286404, 394054, 676826, 1571450, 2253536, 4100508, 5916858, 7271384]
     # plt.plot(x, y, "x-", label="test_zhexian")
     plt.xlabel('Link status change frequency(Hz)')
-    plt.ylabel('#Packets')
-    y1 = [467, 1033, 1809, 3019, 5043, 7936, 10024, 11132]
+    plt.ylabel('#Pkts')
+    y1 = [2454, 3843, 6395, 12517, 17412, 31132, 41993, 52232]
     plt.plot(x, y1, "x-", label="test_zhexian")
     plt.show()
 
+# br1()
 
 fq = [0.125, 0.25, 0.5, 1, 2, 4, 8, 16]
 
@@ -311,40 +319,32 @@ def cal():
         print np.min(out), np.max(out), np.mean(out), np.median(out)
 
 def pc_cdf():
-    bdata = {}
-    pdata = {}
-    with open("ospf_bw64k_fq16hz.dat") as f:
+    bdata = []
+    pdata = []
+    with open("ignored/ospfcount/result.4.dat") as f:
         total_bytes = 0
         total_pkts = 0
         current_sw = 1
 
-        bdata[current_sw] = 0
-        pdata[current_sw] = 0
         while True:
             line = f.readline()
             if line:
                 if line[:5] == 'bytes':
                     data = line.split('=')[1].split(' ')
-                    total_bytes += (int(data[-2]) - int(data[0]))
-                    bdata[current_sw] += total_bytes
+                    total_bytes = (int(data[-2]) - int(data[0]))
+                    bdata.append(total_bytes)
                 elif line[:4] == 'pkts':
                     data = line.split('=')[1].split(' ')
-                    total_pkts += (int(data[-2]) - int(data[0]))
-                    pdata[current_sw] += total_pkts
-                elif line[:2] == 'ns':
-                    current_sw += 1
-                    bdata[current_sw] = 0
-                    pdata[current_sw] = 0
-                    total_bytes = 0
-                    total_pkts = 0
+                    total_pkts = (int(data[-2]) - int(data[0]))
+                    pdata.append(total_pkts)
+
 
             else:
                 break
-        d = [i for i in bdata.values()]
-        p = [i for i in pdata.values()]
-        # cdf(d, '#Bytes')
-        cdf(p, '#Pkts')
+        # cdf(bdata, '#Bytes')
+        cdf(pdata, '#Pkts')
 
+pc_cdf()
 
 def get_time(line):
     timestr = line[:26]
@@ -435,7 +435,7 @@ def new_ospf():
     plt.xlim(0)
     plt.show()
 
-new_ospf()
+# new_ospf()
 
 
 def show():
