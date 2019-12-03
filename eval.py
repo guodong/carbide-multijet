@@ -53,23 +53,23 @@ class Link:
         self.p0 = p0
         self.p1 = p1
 
-    def _up(self):
+    def up(self):
         print 'link up (%s,%s) (%s,%s)' % (self.p0.node.id, self.p0.id, self.p1.node.id, self.p1.id)
         self.p0.node.nsenter_exec("ifconfig e%s up" % self.p0.id)
         self.p1.node.nsenter_exec("ifconfig e%s up" % self.p1.id)
+        self.status = 0
 
-    def _down(self):
+    def down(self):
         print 'link down (%s,%s) (%s,%s)' % (self.p0.node.id, self.p0.id, self.p1.node.id, self.p1.id)
         self.p0.node.nsenter_exec("ifconfig e%s down" % self.p0.id)
         self.p1.node.nsenter_exec("ifconfig e%s down" % self.p1.id)
+        self.status = 1
 
     def toggle(self):
         if self.status == 1:
-            self._down()
-            self.status = 0
+            self.down()
         else:
-            self._up()
-            self.status = 1
+            self.up()
 
 
 class Topology:
@@ -208,6 +208,7 @@ class Main(Cmd):
 
         for i in range(8):
             freq = 0.125 * 2 ** i
+            print "do freq: %s at %s" % (freq, time.time())
 
             result_dir = "ignored/data/eval/result-%d-%f/" % (test_total_time, freq)
             os.system("rm -rf " + result_dir)
