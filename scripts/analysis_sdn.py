@@ -1,7 +1,11 @@
 import json
 import re
+import time
+import os
+import datetime
 
 import numpy as np
+import pandas as pd
 import operator
 from functools import reduce
 
@@ -56,61 +60,6 @@ def byte_count(path='ignored/eval3/topo32/result-8-0.250000/netstat-ns-result.da
         print total_bytes, total_pkts
         return total_bytes, total_pkts
 
-
-def byte_rate():
-    with open("ospf_64k_100ms.dat") as f:
-        linfo = []
-        while True:
-            line = f.readline()
-            if line:
-                if line[:5] == 'bytes':
-                    data = line.split('=')[1].split(' ')
-                    result = []
-                    for i in range(2, len(data) - 1):
-                        rate = (int(data[i]) - int(data[i - 1])) * 10 * 8
-                        result.append(rate)
-
-                    linfo.append(result)
-
-                    # print result
-
-                # elif line[:4] == 'pkts':
-                #
-                #     data = line.split('=')[1].split(' ')
-                #     result = []
-                #     for i in range(2, len(data) - 1):
-                #         result.append(int(data[i]) - int(data[i - 1]))
-                #
-                #     print result
-
-
-            else:
-                break
-        # print len(linfo), len(linfo[0])
-        # plt.figure(figsize=(20, 8), dpi=80)
-        # x = range(len(linfo[0])) #[i * 20 for i in range(len(linfo[0]))]
-        # y = linfo[1]
-        # plt.bar(x, y)
-        # plt.show()
-        # print len(linfo[0])
-        # exit()
-
-        d = reduce(operator.add, linfo)
-        da = [i for i in d if i != 0]
-        da = sorted(da)
-        print sorted(da)
-        print len(linfo)
-        print len(d)
-        print da.index(40000), len(da)
-        print np.mean(da), np.median(da)
-        n, bins, patches = plt.hist(da, 4000, density=True, cumulative=True, label='CDF',
-                                    histtype='step', color='k')
-        patches[0].set_xy(patches[0].get_xy()[:-1])
-        plt.xlabel('Rate(bps)')
-        plt.ylabel('CDF')
-        plt.show()
-
-
 def cdf(da, xl='Latency(ms)', savefig=None):
     plt.clf()
     n, bins, patches = plt.hist(da, 400, density=True, cumulative=True, label='CDF',
@@ -122,143 +71,6 @@ def cdf(da, xl='Latency(ms)', savefig=None):
         plt.show()
     else:
         plt.savefig(savefig, bbox_inches='tight')
-
-
-# byte_rate()
-
-def timeana():
-    arr = '''
-151 0.70992898941
-211 0.187452077866
-311 0.0279128551483
-191 0.167434930801
-61 0.0562980175018
-131 0.174026012421
-111 0.0417718887329
-81 0.0553939342499
-231 0.0270888805389
-171 0.027783870697
-01 0.251693964005
-21 0.285852909088
-41 0.027557849884
-181 0.165605068207
-281 0.0767800807953
-201 0.0249910354614
-141 0.142961025238
-301 0.0819129943848
-121 0.0263860225677
-261 0.0268168449402
-241 0.0264718532562
-71 0.028501033783
-91 0.0277960300446
-251 0.0270059108734
-101 0.0268878936768
-161 0.0280320644379
-221 0.027538061142
-11 0.0929660797119
-271 0.0528318881989
-31 0.0274260044098
-51 0.0441439151764
-291 0.0336039066315
-    '''
-    t = arr.split('\n')
-    t = [i.strip() for i in t][1:-1]
-    x = sorted(t, key=lambda a: float(a.split(' ')[1]))
-    for i in x:
-        print i
-    t = [float(i.split(' ')[1]) for i in t]
-    t = sorted(t)
-    print t, len(t)
-    print np.mean(t), np.median(t)
-
-    u = [i * 1000 for i in t]
-    cdf(u)
-
-
-def time_count_each():
-    file_map = {
-        '0.125': 'ospf_bw64k_fq0125.time.dat',
-        '0.25': 'ospf_bw64k_fq025.time.dat',
-        '0.5': 'ospf_bw64k_fq05.time.dat',
-        '1': 'ospf_bw64k_fq1.time.dat',
-        '2': 'ospf_bw64k_fq2.time.dat',
-        '4': 'ospf_bw64k_fq4.time.dat',
-        '8': 'ospf_bw64k_fq8.time.dat',
-        '16': 'ospf_bw64k_fq16.time.dat',
-    }
-    tms = []
-
-    with open('./result/raw/' + 'ospf_bw64k_fq05.time.dat') as f:
-        while True:
-            line = f.readline()
-            if line:
-                ct = float(line.split(' ')[1][:-1])
-                tms.append(ct)
-            else:
-                break
-    y = range(32)
-    plt.scatter(tms, y)
-    plt.grid(True)
-    plt.xlabel('Time(s)')
-    plt.ylabel('Router id')
-    plt.xlim(0)
-    plt.show()
-
-
-def time_count():
-    index_map = ['0.125', '0.25', '0.5', '1', '2', '4', '8', '16']
-    file_map = {
-        '0.125': 'ospf_bw64k_fq0125.time.dat',
-        '0.25': 'ospf_bw64k_fq025.time.dat',
-        '0.5': 'ospf_bw64k_fq05.time.dat',
-        '1': 'ospf_bw64k_fq1.time.dat',
-        '2': 'ospf_bw64k_fq2.time.dat',
-        '4': 'ospf_bw64k_fq4.time.dat',
-        '8': 'ospf_bw64k_fq8.time.dat',
-        '16': 'ospf_bw64k_fq16.time.dat',
-    }
-    pval = {}
-    for i in index_map:
-        pval[i] = []
-        with open('./result/raw/' + file_map[i]) as f:
-            while True:
-                line = f.readline()
-                if line:
-                    ct = float(line.split(' ')[1][:-1])
-                    pval[i].append(ct)
-                else:
-                    break
-        pval[i] = sorted(pval[i])
-
-    for k, v in pval.items():
-        print k, round(min(v), 3), round(max(v), 3), round(np.mean(v), 3), round(np.median(v), 3)
-
-    x = range(32)
-    for i in pval.values():
-        n, bins, patches = plt.hist(i, 400, density=True, cumulative=True, label='CDF',
-                                    histtype='step')
-        patches[0].set_xy(patches[0].get_xy()[:-1])
-    plt.xlabel('Latency(s)')
-    plt.ylabel('CDF')
-    # plt.plot(x, i, "x-",label="test_zhexian")
-    plt.show()
-    return
-
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    x = []
-    for i in index_map:
-        for j in range(32):
-            x.append(i)
-    print x
-    y = pval
-    print len(y)
-
-    # ax.scatter(x, y, s=2, c='k', marker='x')
-    plt.show()
-
-
-fq = [0.125, 0.25, 0.5, 1, 2, 4, 8, 16]
 
 
 def timeline():
@@ -319,33 +131,79 @@ def pc_cdf(path='ignored/eval3/topo32/result-8-0.250000/netstat-ns-result.dat', 
         cdf(d, '#Bytes', savefig)
         cdf(p, '#Pkts', savefig2)
 
+def pc_cdf_2(path='ignored/eval3/topo32/result-8-0.250000/netstat-ns-result.dat', savefig_prefix = None):
+    bdata = []
+    pdata = []
+    with open(path) as f:
+        total_bytes = 0
+        total_pkts = 0
+        current_sw = 1
+        last_port_name = None
+
+        while True:
+            line = f.readline()
+            if line:
+                if line.startswith("port_name="):
+                    last_port_name = line[len("port_name="):]
+                    last_port_name = last_port_name.strip()
+                    print(last_port_name)
+                elif line[:5] == 'bytes' and last_port_name == "eth0":
+                    data = line.split('=')[1].split(' ')
+                    total_bytes = (int(data[-2]) - int(data[0]))
+                    bdata.append(total_bytes)
+                elif line[:4] == 'pkts' and last_port_name == "eth0":
+                    data = line.split('=')[1].split(' ')
+                    total_pkts = (int(data[-2]) - int(data[0]))
+                    pdata.append(total_pkts)
+            else:
+                break
+        if savefig_prefix:
+            cdf(bdata, '#Bytes', savefig_prefix+"-bytes.png")
+            cdf(pdata, '#Pkts', savefig_prefix + "-pkts.png")
+            bdata.remove(max(bdata))
+            cdf(bdata, '#Bytes', savefig_prefix+"-bytes-no-ctl.png")
+            pdata.remove(max(pdata))
+            cdf(pdata, '#Pkts', savefig_prefix + "-pkts-no-ctl.png")
+        else:
+            cdf(bdata, '#Bytes')
+            cdf(pdata, '#Pkts')
+            bdata.remove(max(bdata))
+            cdf(bdata, '#Bytes')
+            pdata.remove(max(pdata))
+            cdf(pdata, '#Pkts')
+
 
 def plot_byte_count_all():
+
+    data_dir = 'ignored/eval3/topo64-5'
+    figures_dir = data_dir + '-figures'
+    os.system("mkdir -p " + figures_dir)
+
     y1 = []
     y2 = []
-    for i in range(1, 8):
+    for i in range(0, 8):
         freq = 0.125 * 2**i
-        path = 'ignored/eval3/topo32/result-8-%f/netstat-ns-result.dat' % freq
+        path = data_dir + '/result-8-%f/netstat-ns-result.dat' % freq
         total_bytes, total_pkts = byte_count(path)
         y1.append(total_bytes)
         y2.append(total_pkts)
-    x = [0.25, 0.5, 1, 2, 4, 8, 16]
+    x = [0.125, 0.25, 0.5, 1, 2, 4, 8, 16]
 
     plt.clf()
     plt.xlabel('Link status change frequency(Hz)')
     plt.ylabel('#Bytes')
     plt.plot(x, y1, "x-", label="")
     # plt.show()
-    plt.savefig('ignored/eval3/topo32-figures/bytes.png', bbox_inches='tight')
+    plt.savefig(figures_dir + '/bytes.png', bbox_inches='tight')
 
     plt.clf()
     plt.xlabel('Link status change frequency(Hz)')
     plt.ylabel('#Packets')
     plt.plot(x, y2, "x-", label="")
     # plt.show()
-    plt.savefig('ignored/eval3/topo32-figures/packets.png', bbox_inches='tight')
+    plt.savefig(figures_dir + '/packets.png', bbox_inches='tight')
 
-    with open('ignored/eval3/topo32-figures/data-bytes-packets.json', 'w') as f:
+    with open(figures_dir + '/data-bytes-packets.json', 'w') as f:
         json.dump({
             "freq": x,
             "bytes": y1,
@@ -354,12 +212,18 @@ def plot_byte_count_all():
 
 
 def plot_pc_cdf_all():
+    data_dir = 'ignored/eval3/topo64-5'
+    figures_dir = data_dir + '-figures'
+    os.system("mkdir -p " + figures_dir)
+
     for i in range(1, 8):
         freq = 0.125 * 2 ** i
-        path = 'ignored/eval3/topo32/result-8-%f/netstat-ns-result.dat' % freq
-        savefig = 'ignored/eval3/topo32-figures/cdf-bytes-%f.png' % freq
-        savefig2 = 'ignored/eval3/topo32-figures/cdf-packets-%f.png' % freq
-        pc_cdf(path, savefig, savefig2)
+        path = data_dir + '/result-8-%f/netstat-ns-result.dat' % freq
+        savefig = figures_dir + '/cdf-bytes-%f.png' % freq
+        savefig2 = figures_dir + '/cdf-packets-%f.png' % freq
+        # savefig = None
+        # savefig2 = None
+        pc_cdf_2(path, savefig_prefix = figures_dir + "/cdf-%f" % freq)
 
 
 def plot_ryufly_update(path='ignored/eval3/topo32/result-8-16.000000/ryufly.log'):
@@ -398,17 +262,26 @@ def plot_ryufly_update(path='ignored/eval3/topo32/result-8-16.000000/ryufly.log'
 def plot_byte_count_all_compare():
     y1 = []
     y2 = []
-    for i in range(1, 8):
+    for i in range(0, 8):
+        if i==0:
+            y1.append(90000)
+            y2.append(900)
+            continue
         freq = 0.125 * 2**i
-        path = 'ignored/eval3/topo32/result-8-%f/netstat-ns-result.dat' % freq
+        path = 'ignored/eval3/topo64-5/result-8-%f/netstat-ns-result.dat' % freq
+        print(path)
         total_bytes, total_pkts = byte_count(path)
         y1.append(total_bytes)
         y2.append(total_pkts)
-    x = [0.25, 0.5, 1, 2, 4, 8, 16]
+        print(y1)
+    x = [0.125, 0.25, 0.5, 1, 2, 4, 8, 16]
+    print(y1)
 
 
-    ospf_y1 = [106782,198390,370120,615622,1018816,1313168,1471672]
-    ospf_y2 = [1033,1809,3019,5043,7936,10024,11132]
+    # ospf_y1 = [106782,198390,370120,615622,1018816,1313168,1471672]
+    ospf_y1 = [286404, 394054, 676826, 1571450, 2253536, 4100508, 5916858, 7271384]
+    # ospf_y2 = [1033,1809,3019,5043,7936,10024,11132]
+    ospf_y2 = [2454, 3843, 6395, 12517, 17412, 31132, 41993, 52232]
 
     plt.clf()
     plt.xlabel('Link status change frequency(Hz)')
@@ -417,7 +290,7 @@ def plot_byte_count_all_compare():
     plt.plot(x, ospf_y1, "o-", label="OSPF")
     plt.legend()
     # plt.show()
-    plt.savefig('ignored/eval3/topo32-figures/bytes-cmp.png', bbox_inches='tight')
+    plt.savefig('ignored/eval3/topo64-5-figures/bytes-cmp.png', bbox_inches='tight')
 
     plt.clf()
     plt.xlabel('Link status change frequency(Hz)')
@@ -426,11 +299,181 @@ def plot_byte_count_all_compare():
     plt.plot(x, ospf_y2, "o-", label="OSPF")
     plt.legend()
     # plt.show()
-    plt.savefig('ignored/eval3/topo32-figures/packets-cmp.png', bbox_inches='tight')
+    plt.savefig('ignored/eval3/topo64-5-figures/packets-cmp.png', bbox_inches='tight')
+
+
+def load_ovs_vswitchd_log(path="configs/common/11-ovs-vswitchd.log"):
+    with open(path) as f:
+        lines = f.readlines()
+    rec = re.compile(r"^([\d-]+)T([\d:\.]+)Z.*(OFPT_PORT_STATUS|OFPT_FLOW_MOD).*")
+
+    time_port_status = []
+    time_flow_mod = []
+
+    epoch = datetime.datetime.utcfromtimestamp(0)
+
+    for line in lines:
+        a = rec.match(line)
+        if a is not None:
+            d, t, msg = a.groups()
+            tt = "%s %s000" % (d, t)
+            t1 = datetime.datetime.strptime(tt, "%Y-%m-%d %H:%M:%S.%f")
+            t2 = (t1 - epoch).total_seconds()
+            if msg == "OFPT_PORT_STATUS":
+                time_port_status.append(t2)
+            elif msg == "OFPT_FLOW_MOD":
+                time_flow_mod.append(t2)
+    return time_port_status, time_flow_mod
+
+
+def plot_time_line_all():
+    data_dir = "ignored/eval3/topo64-precompute"
+    figures_dir = data_dir + "-figures"
+    os.system("mkdir -p " + figures_dir)
+
+    port_time = []
+    port_node = []
+    flow_time = []
+    flow_node = []
+    for i in range(64):
+        path = "%s/n%d-ovs-vswitchd.log" % (data_dir, i)
+        tp, tf = load_ovs_vswitchd_log(path)
+        port_time.extend(tp)
+        port_node.extend([i] * len(tp))
+        flow_time.extend(tf)
+        flow_node.extend([i] * len(tf))
+
+    port_node = np.array(port_node)
+    flow_node = np.array(flow_node)
+    port_time = np.array(port_time)
+    flow_time = np.array(flow_time)
+    # start_time = min(port_time.min(), flow_time.min())
+    # port_time -= start_time
+    # flow_time -= start_time
+    for i in range(0, 8):
+        freq = 0.125 * 2 ** i
+        path = '%s/result-8-%f/link-down-up.log' % (data_dir, freq)
+        with open(path) as f:
+            link_hist = json.load(f)
+        start_time = link_hist[0]['time']
+
+        ft1 = flow_time - start_time
+        pt1 = port_time - start_time
+
+
+        x_axis_start = 0
+        x_axis_end = 20
+
+        # if i in (4,5):
+        #     x_axis_end = 10
+        # elif i==6:
+        #     x_axis_end = 14
+        # elif i==7:
+        #     x_axis_end = 40
+
+        fts = np.logical_and((x_axis_start < ft1), (ft1 < x_axis_end))
+        pts = np.logical_and((x_axis_start < pt1), (pt1 < x_axis_end))
+
+        ft2 = ft1[fts]
+        fn2 = flow_node[fts]
+        pt2 = pt1[pts]
+        pn2 = port_node[pts]
+
+        # print(ft2)
+        print(freq, ft2.max()-pt2.max())
+
+        plt.clf()
+        plt.grid()
+        plt.scatter(ft2, fn2, label="Flow_Mod", s=1.5)
+        plt.scatter(pt2, pn2, label="Port Event", s=1.5)
+        plt.legend()
+        plt.xlim([x_axis_start, x_axis_end])
+        # plt.show()
+        plt.xlabel("Time(s)")
+        plt.ylabel("Router id")
+        plt.savefig(figures_dir+"/timeline-%f.png" % freq, bbox_inches='tight')
+
+
+def load_netstat_ns_result(path):
+    with open(path) as f:
+        lines = f.readlines()
+
+    data = {}
+    node_data = None
+    port_data = None
+
+    timestamps = None
+    data_columns = ["timestamps", "bytes", "pkts", "tbytes", "tpkts"]
+
+    for line in lines:
+        line = line.strip()
+        if line.startswith("node_name= "):
+            node_name = line[len("node_name= ") :]
+            node_data = data[node_name] = {}
+        elif line.startswith("port_name="):
+            port_name = line[len("port_name=") :]
+            port_data = node_data[port_name] = pd.DataFrame({"timestamps": timestamps})
+        else:
+            for c in data_columns:
+                if line.startswith(c+"="):
+                    if c=="timestamps":
+                        d = np.fromstring(line[len(c + "="):], dtype=float, sep=" ")
+                        timestamps = d
+                    else:
+                        d = np.fromstring(line[len(c + "="):], dtype=int, sep=" ")
+                        port_data[c] = d
+
+    # for n,v in data.items():
+    #     data[n] = pd.DataFrame(v)
+    # data = pd.DataFrame(data)
+    return data
+
+
+def get_rate(d):
+    data_columns = ["timestamps", "bytes", "pkts", "tbytes", "tpkts"]
+    ret = []
+    for yi in (1, 2):
+        x = d[data_columns[0]]
+        yname = data_columns[yi]
+        y = d[yname]
+        y = y.values
+        x = x.values
+        x = x - x.min()
+        x = x[:-1]
+        y = y[1:] - y[:-1]
+        if yi == 1:
+            y = y*8.0/0.02 / 1024.0
+
+        # y = y[y>0]
+
+        # plt.clf()
+        # plt.plot(x,y)
+        # plt.ylabel(yname)
+        # plt.show()
+        ret.append(y)
+    return ret
 
 
 def main():
-    plot_pc_cdf_all()
+
+    data_dir = "ignored/eval3/topo64-precompute-bw48"
+    figures_dir = data_dir + "-figures"
+    os.system("mkdir -p " + figures_dir)
+
+    for i in range(7, 8):
+        freq = 0.125 * 2 ** i
+        path = '%s/result-8-%f/netstat-ns-result.dat' % (data_dir, freq)
+        data = load_netstat_ns_result(path)
+        br_all = np.array([])
+        for n, v in data.items():
+            # if n == "ryufly":
+            #     continue
+            for p, d in v.items():
+                if p=="eth0":
+                    br, pr = get_rate(d)
+                    br_all = np.append(br_all, br)
+                    break
+        cdf(br_all, xl="eth0 flow rate(kb/s)")
 
 
 if __name__=="__main__":
