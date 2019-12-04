@@ -69,6 +69,8 @@ class FlyApp(app_manager.RyuApp):
         self.node_id_to_dp = {}
         self.rules = {}
 
+        self._build_cached()
+
     def _dp_to_node_id(self, dp):
         return self.container_addr_to_node_id[str(dp.address[0])]
 
@@ -120,12 +122,58 @@ class FlyApp(app_manager.RyuApp):
 
         dp.send_msg(msg)
 
+    def _cached_key(self, links):
+        return tuple(sorted(links.items()))
+
+    def _build_cached(self):
+        info("build cached")
+        self._cached = {}
+        ds = [self.up_links]
+
+        computed=set()
+        for p1, p2 in self.up_links.items():
+            if p1 in computed:
+                continue
+            computed.add(p1)
+            computed.add(p2)
+            links = dict(self.up_links)
+            links.pop(p1)
+            links.pop(p2)
+            ds.append(links)
+        
+        info("prepare done!")
+
+        for links in ds:
+            topo = Topology()
+            topo.nodes = self.topo.nodes
+            topo.links = links
+            # info(links)
+            rules2 = shortest_path_fwd_rules(topo)
+            key = self._cached_key(links)
+            self._cached[key] = rules2
+        
+        info("build cached done!")
+
+    def cached_shortest_path_fwd_rules(self, topo):
+        key = self._cached_key(topo.links)
+        value = self._cached.get(key)
+        if value is not None:
+            info("got in cache")
+            return value
+        else:
+            info("not in cache")
+            rules2 = shortest_path_fwd_rules(topo)
+            self._cached[key] = rules
+            return key
+
     def _update(self):
         info("update start", time.time())
         topo = Topology()
         topo.nodes = self.topo.nodes
         topo.links = self.up_links
-        rules2 = shortest_path_fwd_rules(topo)
+        info("before sp", time.time())
+        rules2 = self.cached_shortest_path_fwd_rules(topo)
+        info("after sp", time.time())
         for match, fwds2 in rules2.items():
             fwds = self.rules.get(match)
             if fwds is None:

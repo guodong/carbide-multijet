@@ -46,7 +46,9 @@ class RocketFuel(Cmd):
 
         self.port_status = {}
 
-        if filename.endswith(".json"):
+        if filename.endswith(".f2.json"):
+            self._load_f2_json_topology(filename)
+        elif filename.endswith(".json"):
             self._load_json_topology(filename)
         else:
             self._load_cch_topology(filename)
@@ -100,6 +102,29 @@ class RocketFuel(Cmd):
                             exists = True
                     if not exists:
                         self.links.append([r, n])
+
+    def _load_f2_json_topology(self, filename):
+        with open(filename) as f:
+            conf = json.load(f)
+
+            for n in conf['nodes']:
+                n = "n"+str(n)
+                self.routers[n] = Router(n)
+
+            for n1,n2 in conf['links']:
+                n1 = "n"+str(n1)
+                n2 = "n"+str(n2)
+                r1 = self.routers[n1]
+                r2 = self.routers[n2]
+                if r1 not in r2.neighbors:
+                    r2.neighbors.append(r1)
+                if r2 not in r1.neighbors:
+                    r1.neighbors.append(r2)
+                for l in self.links:
+                    if r1 in l and r2 in l:
+                        break
+                else:
+                    self.links.append([r1, r2])
 
     def attach(self):
         for r in self.routers.values():
@@ -375,25 +400,41 @@ class RocketFuel(Cmd):
             cmd = "ovs-vsctl set-controller s %s" % controller_addr
             print(cmd)
             c.exec_run(cmd)
+    
+    def do_set_ovs_vconn_log_debug(self, line):        
+        for n,c in self.containers.items():
+            cmd = "ovs-appctl vlog/set vconn:file:DBG"
+            print(cmd)
+            c.exec_run(cmd)
 
     def do_eval(self, line):
 
+        self.do_setup_latency("48")
+
+        self.do_truncate_ovs_log("")
+
+        self.do_set_ovs_vconn_log_debug("")
+
+        base_dir = "ignored/data/eval-precompute-bw48/"
+
         test_total_time = 8 # int
 
-        for i in range(8):
+        for i in range(0, 8):
             freq = 0.125* 2**i
 
-            result_dir = "ignored/data/eval/result-%d-%f/" % (test_total_time, freq)
+            result_dir = base_dir + "result-%d-%f/" % (test_total_time, freq)
             os.system("rm -rf " + result_dir)
             os.system("mkdir -p " + result_dir)
 
             link_down_log = "%slink-down-up.log" % (result_dir,)
 
             self.do_start_ryufly(None)
-            self.do_set_ovs_controller_to_ryufly(None)
-            for j in range(10):
+            self.do_setup_latency_ryufly_eth0("48")
+            # self.do_set_ovs_controller("")
+            self.do_set_ovs_controller_to_ryufly("")
+            for j in range(160):
                 time.sleep(1)
-                print(j)
+                print("wait for start", j)
 
             self.do_dump_netstat_ns_config("all")
             self.do_start_netstat_ns(None)
@@ -404,19 +445,24 @@ class RocketFuel(Cmd):
                 links_list = list(sorted(self.topo.links.items()))
                 ri = random.randint(0, len(links_list) - 1)
                 pair = links_list[ri]
-                self._link_down(pair)
+                
                 history = []
                 history.append({
                     'pair': pair,
                     'op': 'down',
                     'time': time.time()
                 })
+
+                self._link_down(pair)
+
                 time.sleep(8)
                 with open(link_down_log, 'w') as f:
                     json.dump(history, f, indent=2)
             else:
                 self.do_link_down_test("%s %d %f" % (link_down_log, test_total_time, freq))
-            time.sleep(5)
+            for j in range(20+i*2):
+                print("wait test over", j)
+                time.sleep(1)
 
             self.do_kill_netstat_ns(None)
             time.sleep(1)
@@ -428,20 +474,55 @@ class RocketFuel(Cmd):
             if pair is not None:
                 self._link_up(pair)
             time.sleep(3)
+        
+        self.do_cp_ovs_log("")
+        os.system("cp configs/common/*chd.log "+ base_dir)
+    
+    def do_cp_ovs_log(self, line):
+        for r in self.topo.nodes:
+            c = self.containers[r]
+            cmd = "cp /var/log/openvswitch/ovs-vswitchd.log  /common/%s-ovs-vswitchd.log" % r
+            print(cmd)
+            c.exec_run(cmd, detach=True)
+    
+    def do_truncate_ovs_log(self, line):
+        for r in self.topo.nodes:
+            c = self.containers[r]
+            cmd = "truncate /var/log/openvswitch/ovs-vswitchd.log  -s 0"
+            print(cmd)
+            c.exec_run(cmd, detach=True)
 
     def do_setup_latency(self, line):
+        if line is None:
+            bw = None
+        else:
+            args = line.split()
+            if len(args)==0:
+                bw = None
+            else:
+                bw = int(args[0])
+
         for l in self.topo.links.items():
-            self._link_set_bw_latency(l, 64, None)
+            self._link_set_bw_latency(l, bw, None)
         for n in self.topo.nodes:
-            self._port_set_bw_latency(n, 'eth0', 64, None)
+            self._port_set_bw_latency(n, 'eth0', bw, None)
     
     def do_setup_latency_ryufly_eth0(self, line):
+        if line is None:
+            bw = None
+        else:
+            args = line.split()
+            if len(args)==0:
+                bw = None
+            else:
+                bw = int(args[0])
+
         name = 'ryufly'
         c = client.containers.get(name)
         if c is None:
             print("not exists")
         else:
-            self._port_set_bw_latency(name, 'eth0', 64, None)
+            self._port_set_bw_latency(name, 'eth0', bw, None)
 
     def do_link_down_test(self, line):
         """link down test"""
@@ -548,8 +629,35 @@ class RocketFuel(Cmd):
         for n, p in pair:
             name = self.topo.nodes[n][p]['name']
             self._port_set_bw_latency(n, name, bw, latency)
-        
+    
     def _port_set_bw_latency(self, node, port_name, bw, latency): #  '11' 'e0'
+            status = self.port_status.setdefault((node, port_name), {})
+            pre_bw = status.setdefault('bw', None)
+            pre_latency = status.setdefault('latency', None)
+            cmds = []
+            
+            if pre_bw != bw:
+                if bw is None:
+                    cmds.append('tc qdisc del dev %s root' % (port_name,))
+                elif pre_bw is None:
+                    cmds.append('tc qdisc del dev %s root' % (port_name,))
+                    cmds.append(
+                        'tc qdisc add dev %s root tbf rate %dkbit burst 5kb latency 70ms peakrate %dkbit minburst 1600' \
+                        % (port_name, bw, bw+2)
+                    )
+                else:
+                    cmds.append('tc qdisc del dev %s root' % (port_name,))
+                    cmds.append(
+                        'tc qdisc change dev %s root tbf rate %dkbit burst 5kb latency 70ms peakrate %dkbit minburst 1600' \
+                        % (port_name, bw, bw+2)
+                    )
+            status['bw'] = bw
+            status['latency'] = latency
+            for cmd in cmds:
+                print(node, cmd)
+                self.node_nsenter_exec(node, cmd)
+
+    def _port_set_bw_latency_htb(self, node, port_name, bw, latency): #  '11' 'e0'
             status = self.port_status.setdefault((node, port_name), {})
             pre_bw = status.setdefault('bw', None)
             pre_latency = status.setdefault('latency', None)
@@ -687,7 +795,7 @@ class RocketFuel(Cmd):
         print(lines)
     
     def do_start_netstat_ns(self, line):
-        os.system("./ignored/netstat-ns/netstat-ns 100 configs/common/netstat_ns.conf &")
+        os.system("./ignored/netstat-ns/netstat-ns 20 configs/common/netstat_ns.conf &")
     
     def do_kill_netstat_ns(self, line):
         os.system("pkill -e netstat-ns")
